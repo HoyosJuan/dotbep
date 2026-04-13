@@ -43,7 +43,7 @@ export interface RuntimeOptions {
   env?: Record<string, string>
 }
 
-export abstract class Runtime<T extends {
+export class Runtime<T extends {
   effects:     Record<string, any>
   automations: Record<string, any>
 } = BepTypes> {
