@@ -37,9 +37,6 @@ lerna-debug.log*
 # Temp directories (anywhere)
 **/temp/
 
-# Generated example BEP (built by npm run example)
-core/examples/example.bep
-
 # MCP build
 mcp/public/
 .claude/settings.local.json
