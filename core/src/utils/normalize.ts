@@ -1,0 +1,32 @@
+import type { BEP } from '../types/schema.js'
+
+export function normalizeBep(bep: BEP): BEP {
+  bep.roles          ??= []
+  bep.members        ??= []
+  bep.teams          ??= []
+  bep.phases         ??= []
+  bep.milestones     ??= []
+  bep.lbs            ??= []
+  bep.disciplines    ??= []
+  bep.extensions     ??= []
+  bep.assetTypes     ??= []
+  bep.softwares      ??= []
+  bep.objectives     ??= []
+  bep.bimUses        ??= []
+  bep.actions        ??= []
+  bep.events         ??= []
+  bep.effects        ??= []
+  bep.workflows      ??= []
+  bep.guides         ??= []
+  bep.annexes        ??= []
+  bep.standards      ??= []
+  bep.lods           ??= []
+  bep.lois           ??= []
+  bep.loin           ??= []
+  bep.deliverables   ??= []
+  bep.notes          ??= []
+  bep.flags          ??= []
+  bep.env            ??= []
+  bep.automations    ??= []
+  return bep
+}

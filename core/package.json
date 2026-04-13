@@ -1,0 +1,30 @@
+{
+  "name": "@dotbep/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "prepublishOnly": "npm run build",
+    "example": "node --experimental-strip-types examples/run-all.ts"
+  },
+  "dependencies": {
+    "fast-json-patch": "3.1.1",
+    "jszip": "3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.13",
+    "vite": "^7.0.0",
+    "vite-plugin-dts": "4.5.4"
+  }
+}

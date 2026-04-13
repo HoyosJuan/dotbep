@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment & local config
+*.local
+.env
+.env.*
+!.env.example
+
+# Editor directories
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Temp directories (anywhere)
+**/temp/
+
+# Generated example BEP (built by npm run example)
+core/examples/example.bep
+
+# MCP build
+mcp/public/
+.claude/settings.local.json

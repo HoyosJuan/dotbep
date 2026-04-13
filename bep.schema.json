@@ -1,0 +1,1594 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DotBEP Schema",
+  "description": "Open format for authoring BIM Execution Plans programmatically.",
+  "bep": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Used in deliverables nomenclature. Must comply with the naming convention token pattern."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "ref Team.id"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "name",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "deliverableNamingConvention": {
+        "type": "object",
+        "properties": {
+          "delimiter": {
+            "type": "string",
+            "minLength": 1
+          },
+          "segments": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "field"
+                    },
+                    "token": {
+                      "type": "string",
+                      "enum": [
+                        "project",
+                        "team",
+                        "discipline",
+                        "assetType",
+                        "lbsZone",
+                        "lbsLocation"
+                      ]
+                    },
+                    "pattern": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "token"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "sequence"
+                    },
+                    "padding": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "delimiter",
+          "segments"
+        ],
+        "additionalProperties": false
+      },
+      "roles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "members": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "description": "Acts as unique ID within the project."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "roleId": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "bepEditor": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "email",
+            "name",
+            "roleId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "teams": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Used in deliverables nomenclature. Must comply with the naming convention token pattern."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "isoRole": {
+              "type": "string",
+              "enum": [
+                "appointing-party",
+                "lead-appointed-party",
+                "appointed-party"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "disciplineIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "representativeEmail": {
+              "description": "ref Member.email",
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            },
+            "memberEmails": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "isoRole"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "phases": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "milestones": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "phaseId": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "date",
+            "phaseId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "lbs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Used in deliverables nomenclature."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "zone",
+                "location"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "lbsNodeIds": {
+              "description": "ref LBSNode.id[]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "disciplines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Used in deliverables nomenclature."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "extensions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "assetTypes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Used in deliverables nomenclature."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extensionIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "softwares": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "assetTypeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "objectives": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "bimUses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "objectiveIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "software": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "ref Software.id[]"
+                }
+              },
+              "required": [
+                "ids"
+              ],
+              "additionalProperties": false
+            },
+            "milestoneIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "workflowIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "actions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "softwareIds": {
+              "description": "ref Software.id[]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "guideIds": {
+              "description": "ref Guide.id[]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "events": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable slug, e.g. \"status-changed\"."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payload": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "url"
+                    ]
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key",
+                  "type",
+                  "required"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "effects": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable slug, e.g. \"notify\"."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "payload": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "url"
+                    ]
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key",
+                  "type",
+                  "required"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "automations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable slug, e.g. \"verify-tolerances\"."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "payload": {
+              "description": "Fields consumed from instance context and passed to the handler.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "url"
+                    ]
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key",
+                  "type",
+                  "required"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "output": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "url"
+                    ]
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key",
+                  "type",
+                  "required"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Fields the handler must return. Guards on outgoing edges reference these."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "output"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "env": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Variable name referenced in effect handlers as config.KEY."
+            },
+            "description": {
+              "type": "string"
+            },
+            "secret": {
+              "description": "If true, the value is masked in the UI after being saved.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "workflows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            },
+            "trackedAssetTypeId": {
+              "description": "ref AssetType.id — the asset type this workflow operates on.",
+              "type": "string"
+            },
+            "diagram": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "LR",
+                    "TB"
+                  ]
+                },
+                "nodes": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "start",
+                          "end",
+                          "process",
+                          "decision",
+                          "automation"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "actionId": {
+                        "description": "ref Action.id",
+                        "type": "string"
+                      },
+                      "automationId": {
+                        "description": "ref FlowAutomation.id",
+                        "type": "string"
+                      },
+                      "responsibleRoleIds": {
+                        "description": "ref Role.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "accountableRoleIds": {
+                        "description": "ref Role.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "consultedRoleIds": {
+                        "description": "ref Role.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "informedRoleIds": {
+                        "description": "ref Role.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "responsibleTeamIds": {
+                        "description": "ref Team.id[] — if set alongside responsibleRoleIds, actor must satisfy both.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "accountableTeamIds": {
+                        "description": "ref Team.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "consultedTeamIds": {
+                        "description": "ref Team.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "informedTeamIds": {
+                        "description": "ref Team.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "responsibleEmails": {
+                        "description": "ref Member.email[] — authorizes specific members regardless of role or team.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "accountableEmails": {
+                        "description": "ref Member.email[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "consultedEmails": {
+                        "description": "ref Member.email[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "informedEmails": {
+                        "description": "ref Member.email[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "timeout": {
+                        "type": "object",
+                        "properties": {
+                          "hours": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "effectId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "ref FlowEffect.id"
+                          }
+                        },
+                        "required": [
+                          "hours",
+                          "effectId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "workflowId": {
+                        "description": "ref Workflow.id — spawns child instances of this workflow when the node is entered.",
+                        "type": "string"
+                      },
+                      "blocking": {
+                        "description": "If true, waits for all spawned child instances to complete before accepting outgoing transitions.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "edges": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "description": "ref FlowNode key"
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "ref FlowNode key"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "triggerEventId": {
+                        "description": "ref FlowEvent.id — the event that fires this transition",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "guard": {
+                        "description": "Condition that must be true for this edge to be taken. On decision nodes: evaluated automatically against the instance context. On process nodes: evaluated against the event payload at trigger time.",
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "eq",
+                              "neq",
+                              "gt",
+                              "lt",
+                              "contains",
+                              "exists"
+                            ]
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "field",
+                          "operator"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "effectIds": {
+                        "description": "ref FlowEffect.id[]",
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "direction",
+                "nodes",
+                "edges"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "diagram"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "guides": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "annexIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "annexes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "video",
+                "document"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "type",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "standards": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "contentPath": {
+              "type": "string",
+              "description": "Relative path to the .md file inside the .bep archive."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "contentPath"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "lods": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "checklist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "lois": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "checklist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "loin": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "element": {
+              "type": "string",
+              "minLength": 1
+            },
+            "disciplineId": {
+              "type": "string"
+            },
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "milestoneId": {
+                    "type": "string"
+                  },
+                  "lodId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "loiId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idsPath": {
+                    "description": "Relative path to the .ids (Information Delivery Specification) file inside the .bep archive.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "milestoneId",
+                  "lodId",
+                  "loiId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "element",
+            "disciplineId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "deliverables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "description": {
+              "type": "string"
+            },
+            "lbsNodeId": {
+              "type": "string"
+            },
+            "disciplineId": {
+              "type": "string"
+            },
+            "assetTypeId": {
+              "type": "string"
+            },
+            "extensionIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "responsibleId": {
+              "type": "string"
+            },
+            "milestoneId": {
+              "type": "string"
+            },
+            "dueDate": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "predecessorId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "disciplineId",
+            "assetTypeId",
+            "responsibleId",
+            "milestoneId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "memberEmail": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "message",
+            "memberEmail",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "flags": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "entity": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "roles",
+                    "members",
+                    "teams",
+                    "phases",
+                    "milestones",
+                    "lbs",
+                    "disciplines",
+                    "extensions",
+                    "assetTypes",
+                    "softwares",
+                    "objectives",
+                    "bimUses",
+                    "actions",
+                    "workflows",
+                    "guides",
+                    "annexes",
+                    "standards",
+                    "lods",
+                    "lois",
+                    "loin",
+                    "deliverables"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "null = BEP-level flag"
+            },
+            "entityId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "info",
+                "warning",
+                "blocking"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "entity",
+            "entityId",
+            "severity",
+            "message",
+            "generatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "project",
+      "roles",
+      "members",
+      "teams",
+      "phases",
+      "milestones",
+      "lbs",
+      "disciplines",
+      "extensions",
+      "assetTypes",
+      "softwares",
+      "objectives",
+      "bimUses",
+      "actions",
+      "events",
+      "effects",
+      "automations",
+      "env",
+      "workflows",
+      "guides",
+      "annexes",
+      "standards",
+      "lods",
+      "lois",
+      "loin",
+      "deliverables",
+      "notes",
+      "flags"
+    ],
+    "additionalProperties": false
+  },
+  "changelog": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "current": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+$",
+        "description": "Current version in \"{major}.{minor}\" format."
+      },
+      "versions": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "pattern": "^\\d+\\.\\d+$",
+                  "description": "Format: \"{major}.{minor}\" (e.g. \"1.0\", \"2.3\")."
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "author": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                  "description": "ref Member.email"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "diff": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Relative path to inverse diff (RFC 6902). null on v0.0."
+                },
+                "type": {
+                  "type": "string",
+                  "const": "patch"
+                }
+              },
+              "required": [
+                "version",
+                "date",
+                "author",
+                "description",
+                "diff",
+                "type"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "pattern": "^\\d+\\.\\d+$",
+                  "description": "Format: \"{major}.{minor}\" (e.g. \"1.0\", \"2.3\")."
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "author": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                  "description": "ref Member.email"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "diff": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Relative path to inverse diff (RFC 6902). null on v0.0."
+                },
+                "type": {
+                  "type": "string",
+                  "const": "version"
+                },
+                "approvedBy": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "description": "ref Member.email[]"
+                }
+              },
+              "required": [
+                "version",
+                "date",
+                "author",
+                "description",
+                "diff",
+                "type",
+                "approvedBy"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      }
+    },
+    "required": [
+      "current",
+      "versions"
+    ],
+    "additionalProperties": false
+  }
+}
