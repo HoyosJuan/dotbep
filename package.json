@@ -13,8 +13,7 @@
     "build:core": "npm run build -w @dotbep/core && node --experimental-strip-types scripts/gen-schema.ts",
     "build": "npm run build:core",
     "publish:core": "npm publish -w @dotbep/core",
-    "schema": "node --experimental-strip-types scripts/gen-schema.ts",
-    "schema:diagram": "node --experimental-strip-types scripts/gen-er-diagram.ts && echo schema.html generated"
+    "schema": "node --experimental-strip-types scripts/gen-schema.ts"
   },
   "dependencies": {
     "zod": "^4"
