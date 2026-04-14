@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'jszip',
+        'zod',
         /^node:/,
         /^fs/,
         /^path/,
