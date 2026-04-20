@@ -16,7 +16,7 @@
           "code": {
             "type": "string",
             "minLength": 1,
-            "description": "Used in deliverables nomenclature. Must comply with the naming convention token pattern."
+            "description": "Must comply with the naming convention token pattern."
           },
           "clientId": {
             "type": "string",
@@ -144,8 +144,7 @@
             "email": {
               "type": "string",
               "format": "email",
-              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
-              "description": "Acts as unique ID within the project."
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
             },
             "name": {
               "type": "string",
@@ -177,7 +176,7 @@
             "id": {
               "type": "string",
               "minLength": 1,
-              "description": "Used in deliverables nomenclature. Must comply with the naming convention token pattern."
+              "description": "Must comply with the naming convention token pattern."
             },
             "name": {
               "type": "string",
@@ -800,6 +799,7 @@
               "type": "object",
               "properties": {
                 "direction": {
+                  "default": "LR",
                   "type": "string",
                   "enum": [
                     "LR",
@@ -1064,6 +1064,7 @@
               "minLength": 1
             },
             "description": {
+              "description": "Short guide description, not it's content",
               "type": "string"
             },
             "annexIds": {

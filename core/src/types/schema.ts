@@ -41,12 +41,12 @@ export type FlagEntityType = z.infer<typeof FlagEntityType>
 export const ProjectSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(1)
-    .describe('Used in deliverables nomenclature. Must comply with the naming convention token pattern.'),
+    .describe('Must comply with the naming convention token pattern.'),
   clientId: z.string()
     .describe('ref Team.id').optional(),
   description: z.string().optional(),
   image: z.string().optional(),
-  websiteUrl: z.string().url().optional(),
+  websiteUrl: z.url().optional(),
 })
 
 export type Project = z.infer<typeof ProjectSchema>
@@ -63,8 +63,7 @@ export const RoleSchema = z.object({
 export type Role = z.infer<typeof RoleSchema>
 
 export const MemberSchema = z.object({
-  email: z.email()
-    .describe('Acts as unique ID within the project.'),
+  email: z.email(),
   name: z.string().min(1),
   roleId: z.string(),
   description: z.string().optional(),
@@ -75,7 +74,7 @@ export type Member = z.infer<typeof MemberSchema>
 
 export const TeamBaseSchema = z.object({
   id: z.string().min(1)
-    .describe('Used in deliverables nomenclature. Must comply with the naming convention token pattern.'),
+    .describe('Must comply with the naming convention token pattern.'),
   name: z.string().min(1),
   isoRole: ISORole,
   description: z.string().optional(),
@@ -397,7 +396,7 @@ export const FlowEdgeSchema = z.object({
 export type FlowEdge = z.infer<typeof FlowEdgeSchema>
 
 export const FlowDiagramSchema = z.object({
-  direction: FlowDirection,
+  direction: FlowDirection.default("LR"),
   nodes: z.record(z.string(), FlowNodeSchema),
   edges: z.record(z.string(), FlowEdgeSchema),
 }).superRefine((diagram, ctx) => {
@@ -460,7 +459,7 @@ export type Annex = z.infer<typeof AnnexSchema>
 export const GuideSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().optional().describe("Short guide description, not it's content"),
   annexIds: z.array(z.string()).optional(),
 })
 

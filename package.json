@@ -15,9 +15,6 @@
     "publish:core": "npm publish -w @dotbep/core",
     "schema": "node --experimental-strip-types scripts/gen-schema.ts"
   },
-  "dependencies": {
-    "zod": "^4"
-  },
   "devDependencies": {
     "typescript": "~5.9.3"
   }
