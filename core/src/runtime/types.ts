@@ -139,7 +139,6 @@ export interface NodeConfig {
     /** eventId to emit */
     emits: string
     requiredPayload: { key: string; type: string; required: boolean }[]
-    guard?: { field: string; operator: string; value?: unknown }
   }[]
 
   /** Transitions that exist but this actor cannot trigger. */

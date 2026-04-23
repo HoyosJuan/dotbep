@@ -111,10 +111,14 @@ export class Engine {
     initiatedBy: string,
   ): Promise<WorkflowInstance | null> {
     this._assertInit()
-    const bep         = this.getBep()
-    const bepVersion  = 'unversioned'
-    const instance    = _createInstance(bep, workflowId, trackedAsset, initiatedBy, bepVersion)
-    if (!instance) return null
+    const bep        = this.getBep()
+    const bepVersion = 'unversioned'
+    const result     = _createInstance(bep, workflowId, trackedAsset, initiatedBy, bepVersion)
+    if (!result) return null
+    const { instance, startEffects } = result
+    for (const ef of startEffects) {
+      await this._executeEffect(instance, ef)
+    }
     await this.storage.saveInstance(bep.project.code, instance)
     await this._fire(this.createdListeners, instance)
     return instance
@@ -214,9 +218,10 @@ export class Engine {
       if (!workflow) return false
       const node = workflow.diagram.nodes[instance.currentNodeId]
       if (!node) return false
+      const raciNode = node.type === 'process' ? node : null
       const requiredRoleIds = [
-        ...(node.responsibleRoleIds ?? []),
-        ...(node.accountableRoleIds ?? []),
+        ...(raciNode?.responsibleRoleIds ?? []),
+        ...(raciNode?.accountableRoleIds ?? []),
       ]
       return requiredRoleIds.length === 0 || requiredRoleIds.includes(member.roleId)
     })

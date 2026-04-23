@@ -2,7 +2,7 @@ import type {
   Action, Annex, FlowAutomation, BIMUse, Deliverable, Discipline,
   AssetType, Extension, Role, Guide, LBSNode,
   LOD, LOI, LOIN, LOINMilestone, Member, Milestone, Note,
-  Objective, Phase, Software, Team, Workflow, FlowDiagram, FlowNode,
+  Objective, Phase, Software, Team, Workflow, FlowDiagram, NodeType, NodeTimeout,
 } from './schema.js'
 
 // ─── RACI ─────────────────────────────────────────────────────────────────────
@@ -75,13 +75,12 @@ export type RaciEntry = {
   members: Member[]
 }
 
-export type FlowNodeResolved = Omit<FlowNode,
-  | 'actionId' | 'automationId'
-  | 'responsibleRoleIds' | 'responsibleTeamIds' | 'responsibleEmails'
-  | 'accountableRoleIds' | 'accountableTeamIds' | 'accountableEmails'
-  | 'consultedRoleIds'   | 'consultedTeamIds'   | 'consultedEmails'
-  | 'informedRoleIds'    | 'informedTeamIds'    | 'informedEmails'
-> & {
+export type FlowNodeResolved = {
+  type:        NodeType
+  label?:      string
+  workflowId?: string
+  blocking?:   boolean
+  timeouts?:   NodeTimeout[]
   action:      Action | null
   automation:  FlowAutomation | null
   responsible: RaciEntry

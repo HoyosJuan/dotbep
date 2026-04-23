@@ -287,11 +287,9 @@ export const NodeTimeoutSchema = z.object({
 
 export type NodeTimeout = z.infer<typeof NodeTimeoutSchema>
 
-export const FlowNodeSchema = z.object({
-  type:      NodeType,
-  label:     z.string().optional(),
-  actionId:      z.string().optional().describe('ref Action.id'),
-  automationId:  z.string().optional().describe('ref FlowAutomation.id'),
+// ── Mixins ──
+
+const RaciMixinSchema = z.object({
   responsibleRoleIds:  z.array(z.string()).optional().describe('ref Role.id[]'),
   accountableRoleIds:  z.array(z.string()).optional().describe('ref Role.id[]'),
   consultedRoleIds:    z.array(z.string()).optional().describe('ref Role.id[]'),
@@ -304,69 +302,70 @@ export const FlowNodeSchema = z.object({
   accountableEmails:   z.array(z.string()).optional().describe('ref Member.email[]'),
   consultedEmails:     z.array(z.string()).optional().describe('ref Member.email[]'),
   informedEmails:      z.array(z.string()).optional().describe('ref Member.email[]'),
-  timeout:   NodeTimeoutSchema.optional(),
+})
 
-  // ── Composition ──
+const TimeoutMixinSchema = z.object({
+  timeouts: z.array(NodeTimeoutSchema).optional(),
+})
+
+// ── Concrete node schemas ──
+
+export const FlowStartNodeSchema = z.object({
+  type: z.literal('start'),
+})
+
+export const FlowEndNodeSchema = z.object({
+  type: z.literal('end'),
+})
+
+export const FlowDecisionNodeSchema = z.object({
+  type:  z.literal('decision'),
+  label: z.string().min(1),
+})
+
+export const FlowAutomationNodeSchema = z.object({
+  type:         z.literal('automation'),
+  automationId: z.string().min(1).describe('ref FlowAutomation.id'),
+}).extend(TimeoutMixinSchema.shape)
+
+export const FlowProcessNodeSchema = z.object({
+  type:       z.literal('process'),
+  actionId:   z.string().optional().describe('ref Action.id'),
   workflowId: z.string().optional().describe('ref Workflow.id — spawns child instances of this workflow when the node is entered.'),
   blocking:   z.boolean().optional().describe('If true, waits for all spawned child instances to complete before accepting outgoing transitions.'),
-})
-  .refine(n => !(n.actionId && n.workflowId), {
-    message: 'A node cannot have both actionId and workflowId.',
-    path: ['workflowId'],
+}).extend(RaciMixinSchema.shape).extend(TimeoutMixinSchema.shape)
+  .refine(n => !!n.actionId !== !!n.workflowId, {
+    message: 'process nodes require exactly one of actionId or workflowId.',
+    path: ['actionId'],
   })
   .refine(n => !n.blocking || !!n.workflowId, {
     message: 'blocking requires workflowId to be set.',
     path: ['blocking'],
   })
-  .refine(n => n.type !== 'automation' || !!n.automationId, {
-    message: 'Automation nodes require automationId.',
-    path: ['automationId'],
-  })
-  // ── label ──
-  .refine(n => n.type !== 'decision' || !!n.label, {
-    message: 'decision nodes require a label.',
-    path: ['label'],
-  })
-  .refine(n => n.type === 'decision' || !n.label, {
-    message: 'label is only valid on decision nodes.',
-    path: ['label'],
-  })
-  // ── actionId / automationId / workflowId per type ──
-  .refine(n => !['start', 'end'].includes(n.type) || (!n.actionId && !n.automationId && !n.workflowId), {
-    message: 'start/end nodes cannot have actionId, automationId, or workflowId.',
-    path: ['type'],
-  })
-  .refine(n => n.type !== 'decision' || (!n.actionId && !n.automationId && !n.workflowId), {
-    message: 'decision nodes cannot have actionId, automationId, or workflowId.',
-    path: ['type'],
-  })
-  .refine(n => n.type !== 'automation' || (!n.actionId && !n.workflowId), {
-    message: 'automation nodes cannot have actionId or workflowId.',
-    path: ['type'],
-  })
-  .refine(n => n.type !== 'process' || !n.automationId, {
-    message: 'process nodes cannot have automationId.',
-    path: ['automationId'],
-  })
-  // ── RACI only on process and decision ──
-  .refine(n => ['process', 'decision'].includes(n.type) || (
-    !n.responsibleRoleIds?.length && !n.accountableRoleIds?.length &&
-    !n.consultedRoleIds?.length   && !n.informedRoleIds?.length &&
-    !n.responsibleTeamIds?.length && !n.accountableTeamIds?.length &&
-    !n.consultedTeamIds?.length   && !n.informedTeamIds?.length &&
-    !n.responsibleEmails?.length  && !n.accountableEmails?.length &&
-    !n.consultedEmails?.length    && !n.informedEmails?.length
-  ), {
-    message: 'RACI fields are only valid on process and decision nodes.',
-    path: ['type'],
-  })
-  // ── timeout only on process and automation ──
-  .refine(n => ['process', 'automation'].includes(n.type) || !n.timeout, {
-    message: 'timeout is only valid on process and automation nodes.',
-    path: ['timeout'],
-  })
+  .refine(n =>
+    (n.responsibleRoleIds?.length ?? 0) > 0 ||
+    (n.responsibleTeamIds?.length ?? 0) > 0 ||
+    (n.responsibleEmails?.length ?? 0) > 0,
+    {
+      message: 'process nodes require at least one responsible (role, team, or email).',
+      path: ['responsibleRoleIds'],
+    }
+  )
 
-export type FlowNode = z.infer<typeof FlowNodeSchema>
+export const FlowNodeSchema = z.union([
+  FlowStartNodeSchema,
+  FlowEndNodeSchema,
+  FlowDecisionNodeSchema,
+  FlowAutomationNodeSchema,
+  FlowProcessNodeSchema,
+])
+
+export type FlowStartNode      = z.infer<typeof FlowStartNodeSchema>
+export type FlowEndNode        = z.infer<typeof FlowEndNodeSchema>
+export type FlowDecisionNode   = z.infer<typeof FlowDecisionNodeSchema>
+export type FlowAutomationNode = z.infer<typeof FlowAutomationNodeSchema>
+export type FlowProcessNode    = z.infer<typeof FlowProcessNodeSchema>
+export type FlowNode           = z.infer<typeof FlowNodeSchema>
 
 export const EdgeGuardSchema = z.object({
   field:    z.string().min(1),
@@ -380,51 +379,142 @@ export const EdgeGuardSchema = z.object({
 
 export type EdgeGuard = z.infer<typeof EdgeGuardSchema>
 
-export const FlowEdgeSchema = z.object({
-  from:       z.string().describe('ref FlowNode key'),
-  to:         z.string().describe('ref FlowNode key'),
-  label:      z.string().optional(),
-  triggerEventId: z.string().min(1).optional().describe('ref FlowEvent.id — the event that fires this transition'),
-  guard:      EdgeGuardSchema.optional().describe('Condition that must be true for this edge to be taken. On decision nodes: evaluated automatically against the instance context. On process nodes: evaluated against the event payload at trigger time.'),
-  effectIds:  z.array(z.string().min(1)).optional().describe('ref FlowEffect.id[]'),
+const FlowEdgeBaseSchema = z.object({
+  from:      z.string().describe('ref FlowNode key'),
+  to:        z.string().describe('ref FlowNode key'),
+  label:     z.string().optional(),
+  effectIds: z.array(z.string().min(1)).optional().describe('ref FlowEffect.id[]'),
+}).refine(e => e.from !== e.to, {
+  message: 'A flow edge cannot point from a node to itself.',
+  path: ['to'],
 })
-  .refine(e => e.from !== e.to, {
-    message: 'A flow edge cannot point from a node to itself.',
-    path: ['to'],
-  })
 
-export type FlowEdge = z.infer<typeof FlowEdgeSchema>
+export const FlowTransitionEdgeSchema = FlowEdgeBaseSchema.extend({
+  triggerEventId: z.string().min(1).describe('ref FlowEvent.id — the event that fires this transition'),
+})
+
+export const FlowDecisionEdgeSchema = FlowEdgeBaseSchema.extend({
+  guard: EdgeGuardSchema.describe('Condition evaluated against the instance context to determine which path to take.'),
+})
+
+// Edges from start/end nodes carry no trigger and no guard — they are structural connectors only.
+export const FlowDirectEdgeSchema = FlowEdgeBaseSchema
+
+export const FlowEdgeSchema = z.union([FlowTransitionEdgeSchema, FlowDecisionEdgeSchema, FlowDirectEdgeSchema])
+
+export type FlowTransitionEdge = z.infer<typeof FlowTransitionEdgeSchema>
+export type FlowDecisionEdge   = z.infer<typeof FlowDecisionEdgeSchema>
+export type FlowDirectEdge     = z.infer<typeof FlowDirectEdgeSchema>
+export type FlowEdge           = z.infer<typeof FlowEdgeSchema>
 
 export const FlowDiagramSchema = z.object({
   direction: FlowDirection.default("LR"),
   nodes: z.record(z.string(), FlowNodeSchema),
   edges: z.record(z.string(), FlowEdgeSchema),
 }).superRefine((diagram, ctx) => {
+  const nodeEntries = Object.entries(diagram.nodes)
+
+  // ── Exactly one start and one end ──
+  const startCount = nodeEntries.filter(([, n]) => n.type === 'start').length
+  const endCount   = nodeEntries.filter(([, n]) => n.type === 'end').length
+
+  if (startCount !== 1) {
+    ctx.addIssue({
+      code: "custom",
+      message: `Diagram must have exactly one start node (found ${startCount}).`,
+      path: ['nodes'],
+    })
+  }
+
+  if (endCount !== 1) {
+    ctx.addIssue({
+      code: "custom",
+      message: `Diagram must have exactly one end node (found ${endCount}).`,
+      path: ['nodes'],
+    })
+  }
+
+  // ── Build outgoing edge index ──
+  const outgoing: Record<string, { edgeId: string; toKey: string }[]> = {}
+  for (const [edgeId, edge] of Object.entries(diagram.edges)) {
+    outgoing[edge.from] ??= []
+    outgoing[edge.from].push({ edgeId, toKey: edge.to })
+  }
+
+  // ── Per-node structural rules ──
+  for (const [nodeKey, node] of nodeEntries) {
+    const outs = outgoing[nodeKey] ?? []
+
+    if (node.type === 'automation') {
+      if (outs.length !== 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: `automation node must have exactly one outgoing edge (found ${outs.length}).`,
+          path: ['nodes', nodeKey],
+        })
+      } else if (diagram.nodes[outs[0].toKey]?.type !== 'decision') {
+        ctx.addIssue({
+          code: "custom",
+          message: 'automation node must connect directly to a decision node.',
+          path: ['nodes', nodeKey],
+        })
+      }
+    }
+
+    if (node.type === 'decision' && outs.length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: `decision node must have at least two outgoing edges (found ${outs.length}).`,
+        path: ['nodes', nodeKey],
+      })
+    }
+  }
+
+  // ── Per-edge structural rules ──
   for (const [edgeId, edge] of Object.entries(diagram.edges)) {
     const fromNode = diagram.nodes[edge.from]
     if (!fromNode) continue
 
-    if (fromNode.type === 'start' && edge.triggerEventId !== undefined) {
+    const hasTriggerId = 'triggerEventId' in edge
+    const hasGuard     = 'guard' in edge
+
+    if (fromNode.type === 'start' && (hasTriggerId || hasGuard)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Edges from start nodes cannot have a trigger — instance creation is the implicit trigger.',
-        path: ['edges', edgeId, 'trigger'],
+        code: "custom",
+        message: 'Edges from start nodes cannot have a trigger or guard — instance creation is the implicit trigger.',
+        path: ['edges', edgeId],
       })
     }
 
-    if (fromNode.type === 'decision' && edge.triggerEventId !== undefined) {
+    if (fromNode.type === 'decision' && !hasGuard) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
+        message: 'Edges from decision nodes must have a guard — all paths must be explicit.',
+        path: ['edges', edgeId, 'guard'],
+      })
+    }
+
+    if (fromNode.type === 'decision' && hasTriggerId) {
+      ctx.addIssue({
+        code: "custom",
         message: 'Edges from decision nodes cannot have a trigger — traversal is automatic via guards.',
-        path: ['edges', edgeId, 'trigger'],
+        path: ['edges', edgeId, 'triggerEventId'],
       })
     }
 
-    if ((fromNode.type === 'process' || fromNode.type === 'automation') && edge.triggerEventId === undefined) {
+    if ((fromNode.type === 'process' || fromNode.type === 'automation') && !hasTriggerId) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: `Edges from ${fromNode.type} nodes must have a trigger.`,
-        path: ['edges', edgeId, 'trigger'],
+        path: ['edges', edgeId, 'triggerEventId'],
+      })
+    }
+
+    if ((fromNode.type === 'process' || fromNode.type === 'automation') && hasGuard) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Edges from ${fromNode.type} nodes cannot have a guard — use a decision node to branch.`,
+        path: ['edges', edgeId, 'guard'],
       })
     }
   }

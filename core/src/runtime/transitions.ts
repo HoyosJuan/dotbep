@@ -40,9 +40,8 @@ export function evaluateGuard(guard: EdgeGuard, payload: Record<string, unknown>
 // ─── Edge matching ────────────────────────────────────────────────────────────
 
 function edgeMatchesEvent(edge: FlowEdge, event: IncomingEvent): boolean {
-  if (!edge.triggerEventId) return false
+  if (!('triggerEventId' in edge)) return false
   if (edge.triggerEventId !== event.eventId) return false
-  if (edge.guard && !evaluateGuard(edge.guard, event.payload)) return false
   return true
 }
 
@@ -79,7 +78,7 @@ export function createInstance(
   trackedAsset: WorkflowInstance['trackedAsset'],
   initiatedBy: string,
   bepVersion: string,
-): WorkflowInstance | null {
+): { instance: WorkflowInstance; startEffects: { effectId: string; fromEdgeId: string }[] } | null {
   const workflow = bep.workflows.find(w => w.id === workflowId)
   if (!workflow) return null
 
@@ -89,22 +88,28 @@ export function createInstance(
   if (!startNodeId) return null
 
   // Advance past the start node — find its single outgoing edge (no trigger required).
-  const startEdge = Object.values(workflow.diagram.edges).find(e => e.from === startNodeId)
-  const firstNodeId = startEdge?.to ?? startNodeId
+  const startEdgeEntry = Object.entries(workflow.diagram.edges).find(([, e]) => e.from === startNodeId)
+  const firstNodeId = startEdgeEntry?.[1].to ?? startNodeId
+  const startEffects = startEdgeEntry
+    ? (startEdgeEntry[1].effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: startEdgeEntry[0] }))
+    : []
 
   const now = new Date().toISOString()
   return {
-    id: globalThis.crypto.randomUUID(),
-    workflowId,
-    bepVersion,
-    trackedAsset,
-    currentNodeId: firstNodeId,
-    status: 'active',
-    context: {},
-    history: [],
-    createdAt: now,
-    updatedAt: now,
-    initiatedBy,
+    instance: {
+      id: globalThis.crypto.randomUUID(),
+      workflowId,
+      bepVersion,
+      trackedAsset,
+      currentNodeId: firstNodeId,
+      status: 'active',
+      context: {},
+      history: [],
+      createdAt: now,
+      updatedAt: now,
+      initiatedBy,
+    },
+    startEffects,
   }
 }
 
@@ -168,7 +173,7 @@ export function processEvent(
 
     const outgoing = Object.entries(edges).filter(([, e]) => {
       if (e.from !== currentNodeId) return false
-      if (!e.guard) return true  // no guard = unconditional branch
+      if (!('guard' in e)) return false
       return evaluateGuard(e.guard, context)
     })
 
@@ -274,23 +279,25 @@ export function getNodeConfig(
     return false
   }
 
+  const raciNode = currentNode.type === 'process' ? currentNode : null
+
   const hasResponsible = !!(
-    currentNode.responsibleRoleIds?.length ||
-    currentNode.responsibleTeamIds?.length ||
-    currentNode.responsibleEmails?.length
+    raciNode?.responsibleRoleIds?.length ||
+    raciNode?.responsibleTeamIds?.length ||
+    raciNode?.responsibleEmails?.length
   )
   const hasAccountable = !!(
-    currentNode.accountableRoleIds?.length ||
-    currentNode.accountableTeamIds?.length ||
-    currentNode.accountableEmails?.length
+    raciNode?.accountableRoleIds?.length ||
+    raciNode?.accountableTeamIds?.length ||
+    raciNode?.accountableEmails?.length
   )
 
   // No R or A defined on the node → open to anyone.
   // Otherwise actor must satisfy at least one of the defined constraints.
   const actorIsAuthorized =
     (!hasResponsible && !hasAccountable) ||
-    (hasResponsible && matchesConstraints(currentNode.responsibleRoleIds, currentNode.responsibleTeamIds, currentNode.responsibleEmails)) ||
-    (hasAccountable && matchesConstraints(currentNode.accountableRoleIds, currentNode.accountableTeamIds, currentNode.accountableEmails))
+    (hasResponsible && matchesConstraints(raciNode?.responsibleRoleIds, raciNode?.responsibleTeamIds, raciNode?.responsibleEmails)) ||
+    (hasAccountable && matchesConstraints(raciNode?.accountableRoleIds, raciNode?.accountableTeamIds, raciNode?.accountableEmails))
 
   // Resolve required payload fields from the global FlowEvent catalog.
   const resolvePayload = (eventId: string) =>
@@ -304,7 +311,8 @@ export function getNodeConfig(
   const blockedTransitions:   NodeConfig['blockedTransitions']   = []
 
   for (const [edgeId, edge] of Object.entries(edges)) {
-    if (edge.from !== instance.currentNodeId || !edge.triggerEventId) continue
+    if (edge.from !== instance.currentNodeId) continue
+    if (!('triggerEventId' in edge)) continue
 
     const eventId = edge.triggerEventId
 
@@ -314,9 +322,6 @@ export function getNodeConfig(
         label:           edge.label ?? eventId,
         emits:           eventId,
         requiredPayload: resolvePayload(eventId),
-        guard:           edge.guard
-          ? { field: edge.guard.field, operator: edge.guard.operator, value: edge.guard.value }
-          : undefined,
       })
     } else {
       blockedTransitions.push({
@@ -324,9 +329,9 @@ export function getNodeConfig(
         label:    edge.label ?? eventId,
         reason:   'UNAUTHORIZED',
         required: buildRaciLevel(
-          [...(currentNode.responsibleRoleIds ?? []), ...(currentNode.accountableRoleIds ?? [])],
-          [...(currentNode.responsibleTeamIds ?? []), ...(currentNode.accountableTeamIds ?? [])],
-          [...(currentNode.responsibleEmails  ?? []), ...(currentNode.accountableEmails  ?? [])],
+          [...(raciNode?.responsibleRoleIds ?? []), ...(raciNode?.accountableRoleIds ?? [])],
+          [...(raciNode?.responsibleTeamIds ?? []), ...(raciNode?.accountableTeamIds ?? [])],
+          [...(raciNode?.responsibleEmails  ?? []), ...(raciNode?.accountableEmails  ?? [])],
         ),
       })
     }
@@ -341,10 +346,10 @@ export function getNodeConfig(
     availableTransitions,
     blockedTransitions,
     raci: {
-      responsible: buildRaciLevel(currentNode.responsibleRoleIds, currentNode.responsibleTeamIds, currentNode.responsibleEmails),
-      accountable:  buildRaciLevel(currentNode.accountableRoleIds, currentNode.accountableTeamIds, currentNode.accountableEmails),
-      consulted:    buildRaciLevel(currentNode.consultedRoleIds,   currentNode.consultedTeamIds,   currentNode.consultedEmails),
-      informed:     buildRaciLevel(currentNode.informedRoleIds,    currentNode.informedTeamIds,    currentNode.informedEmails),
+      responsible: buildRaciLevel(raciNode?.responsibleRoleIds, raciNode?.responsibleTeamIds, raciNode?.responsibleEmails),
+      accountable:  buildRaciLevel(raciNode?.accountableRoleIds, raciNode?.accountableTeamIds, raciNode?.accountableEmails),
+      consulted:    buildRaciLevel(raciNode?.consultedRoleIds,   raciNode?.consultedTeamIds,   raciNode?.consultedEmails),
+      informed:     buildRaciLevel(raciNode?.informedRoleIds,    raciNode?.informedTeamIds,    raciNode?.informedEmails),
     },
     isTerminal: currentNode.type === 'end',
   }
