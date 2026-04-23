@@ -13,7 +13,7 @@ export class Automations extends Entity<FlowAutomation> {
         beforeRemove: (id, bep) => {
           for (const wf of bep.workflows) {
             for (const [nodeKey, node] of Object.entries(wf.diagram.nodes)) {
-              if (node.automationId === id)
+              if (node.type === 'automation' && node.automationId === id)
                 throw new Error(`Referenced by: workflows["${wf.id}"].diagram.nodes["${nodeKey}"].automationId`)
             }
           }

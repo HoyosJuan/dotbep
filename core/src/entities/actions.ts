@@ -14,7 +14,7 @@ export class Actions extends Entity<Action, true> {
         beforeRemove: (id, bep) => {
           for (const wf of bep.workflows) {
             for (const [nodeKey, node] of Object.entries(wf.diagram.nodes)) {
-              if (node.actionId === id)
+              if (node.type === 'process' && node.actionId === id)
                 throw new Error(`Referenced by: workflows["${wf.id}"].diagram.nodes["${nodeKey}"].actionId`)
             }
           }

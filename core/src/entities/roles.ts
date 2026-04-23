@@ -15,6 +15,7 @@ export class Roles extends Entity<Role, true> {
           const raciFields = ['responsibleRoleIds', 'accountableRoleIds', 'consultedRoleIds', 'informedRoleIds'] as const
           for (const wf of bep.workflows) {
             for (const [nodeKey, node] of Object.entries(wf.diagram.nodes)) {
+              if (node.type !== 'process') continue
               for (const field of raciFields) {
                 if (node[field]?.includes(id))
                   throw new Error(`Referenced by: workflows["${wf.id}"].diagram.nodes["${nodeKey}"].${field}`)

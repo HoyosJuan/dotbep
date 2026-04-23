@@ -13,7 +13,7 @@ export class Events extends Entity<FlowEvent> {
         beforeRemove: (id, bep) => {
           for (const wf of bep.workflows) {
             for (const [edgeKey, edge] of Object.entries(wf.diagram.edges)) {
-              if (edge.triggerEventId === id)
+              if ('triggerEventId' in edge && edge.triggerEventId === id)
                 throw new Error(`Referenced by: workflows["${wf.id}"].diagram.edges["${edgeKey}"].trigger`)
             }
           }
