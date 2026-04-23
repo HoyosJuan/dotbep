@@ -37,7 +37,8 @@
           "name",
           "code"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "General metadata about the construction project the BEP belongs to."
       },
       "deliverableNamingConvention": {
         "type": "object",
@@ -812,145 +813,224 @@
                     "type": "string"
                   },
                   "additionalProperties": {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "enum": [
-                          "start",
-                          "end",
-                          "process",
-                          "decision",
-                          "automation"
-                        ]
-                      },
-                      "label": {
-                        "type": "string"
-                      },
-                      "actionId": {
-                        "description": "ref Action.id",
-                        "type": "string"
-                      },
-                      "automationId": {
-                        "description": "ref FlowAutomation.id",
-                        "type": "string"
-                      },
-                      "responsibleRoleIds": {
-                        "description": "ref Role.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "accountableRoleIds": {
-                        "description": "ref Role.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "consultedRoleIds": {
-                        "description": "ref Role.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "informedRoleIds": {
-                        "description": "ref Role.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "responsibleTeamIds": {
-                        "description": "ref Team.id[] — if set alongside responsibleRoleIds, actor must satisfy both.",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "accountableTeamIds": {
-                        "description": "ref Team.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "consultedTeamIds": {
-                        "description": "ref Team.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "informedTeamIds": {
-                        "description": "ref Team.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "responsibleEmails": {
-                        "description": "ref Member.email[] — authorizes specific members regardless of role or team.",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "accountableEmails": {
-                        "description": "ref Member.email[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "consultedEmails": {
-                        "description": "ref Member.email[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "informedEmails": {
-                        "description": "ref Member.email[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "timeout": {
+                    "anyOf": [
+                      {
                         "type": "object",
                         "properties": {
-                          "hours": {
-                            "type": "number",
-                            "exclusiveMinimum": 0
-                          },
-                          "effectId": {
+                          "type": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "ref FlowEffect.id"
+                            "const": "start"
                           }
                         },
                         "required": [
-                          "hours",
-                          "effectId"
+                          "type"
                         ],
                         "additionalProperties": false
                       },
-                      "workflowId": {
-                        "description": "ref Workflow.id — spawns child instances of this workflow when the node is entered.",
-                        "type": "string"
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "end"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "additionalProperties": false
                       },
-                      "blocking": {
-                        "description": "If true, waits for all spawned child instances to complete before accepting outgoing transitions.",
-                        "type": "boolean"
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "decision"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "automation"
+                          },
+                          "automationId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "ref FlowAutomation.id"
+                          },
+                          "timeouts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "hours": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "effectId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "ref FlowEffect.id"
+                                }
+                              },
+                              "required": [
+                                "hours",
+                                "effectId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "automationId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "process"
+                          },
+                          "actionId": {
+                            "description": "ref Action.id",
+                            "type": "string"
+                          },
+                          "workflowId": {
+                            "description": "ref Workflow.id — spawns child instances of this workflow when the node is entered.",
+                            "type": "string"
+                          },
+                          "blocking": {
+                            "description": "If true, waits for all spawned child instances to complete before accepting outgoing transitions.",
+                            "type": "boolean"
+                          },
+                          "responsibleRoleIds": {
+                            "description": "ref Role.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "accountableRoleIds": {
+                            "description": "ref Role.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "consultedRoleIds": {
+                            "description": "ref Role.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "informedRoleIds": {
+                            "description": "ref Role.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "responsibleTeamIds": {
+                            "description": "ref Team.id[] — if set alongside responsibleRoleIds, actor must satisfy both.",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "accountableTeamIds": {
+                            "description": "ref Team.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "consultedTeamIds": {
+                            "description": "ref Team.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "informedTeamIds": {
+                            "description": "ref Team.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "responsibleEmails": {
+                            "description": "ref Member.email[] — authorizes specific members regardless of role or team.",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "accountableEmails": {
+                            "description": "ref Member.email[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "consultedEmails": {
+                            "description": "ref Member.email[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "informedEmails": {
+                            "description": "ref Member.email[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "timeouts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "hours": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "effectId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "ref FlowEffect.id"
+                                }
+                              },
+                              "required": [
+                                "hours",
+                                "effectId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "type"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 },
                 "edges": {
@@ -959,77 +1039,141 @@
                     "type": "string"
                   },
                   "additionalProperties": {
-                    "type": "object",
-                    "properties": {
-                      "from": {
-                        "type": "string",
-                        "description": "ref FlowNode key"
-                      },
-                      "to": {
-                        "type": "string",
-                        "description": "ref FlowNode key"
-                      },
-                      "label": {
-                        "type": "string"
-                      },
-                      "triggerEventId": {
-                        "description": "ref FlowEvent.id — the event that fires this transition",
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "guard": {
-                        "description": "Condition that must be true for this edge to be taken. On decision nodes: evaluated automatically against the instance context. On process nodes: evaluated against the event payload at trigger time.",
+                    "anyOf": [
+                      {
                         "type": "object",
                         "properties": {
-                          "field": {
+                          "from": {
                             "type": "string",
-                            "minLength": 1
+                            "description": "ref FlowNode key"
                           },
-                          "operator": {
+                          "to": {
                             "type": "string",
-                            "enum": [
-                              "eq",
-                              "neq",
-                              "gt",
-                              "lt",
-                              "contains",
-                              "exists"
-                            ]
+                            "description": "ref FlowNode key"
                           },
-                          "value": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              }
-                            ]
+                          "label": {
+                            "type": "string"
+                          },
+                          "effectIds": {
+                            "description": "ref FlowEffect.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "triggerEventId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "ref FlowEvent.id — the event that fires this transition"
                           }
                         },
                         "required": [
-                          "field",
-                          "operator"
+                          "from",
+                          "to",
+                          "triggerEventId"
                         ],
                         "additionalProperties": false
                       },
-                      "effectIds": {
-                        "description": "ref FlowEffect.id[]",
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
+                      {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "type": "string",
+                            "description": "ref FlowNode key"
+                          },
+                          "to": {
+                            "type": "string",
+                            "description": "ref FlowNode key"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "effectIds": {
+                            "description": "ref FlowEffect.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "guard": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "gt",
+                                  "lt",
+                                  "contains",
+                                  "exists"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "operator"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Condition evaluated against the instance context to determine which path to take."
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to",
+                          "guard"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "type": "string",
+                            "description": "ref FlowNode key"
+                          },
+                          "to": {
+                            "type": "string",
+                            "description": "ref FlowNode key"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "effectIds": {
+                            "description": "ref FlowEffect.id[]",
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "from",
-                      "to"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 }
               },

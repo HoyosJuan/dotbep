@@ -47,7 +47,7 @@ export const ProjectSchema = z.object({
   description: z.string().optional(),
   image: z.string().optional(),
   websiteUrl: z.url().optional(),
-})
+}).describe('General metadata about the construction project the BEP belongs to.')
 
 export type Project = z.infer<typeof ProjectSchema>
 
@@ -58,7 +58,7 @@ export const RoleSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-})
+}).describe('Defines a stakeholder role in the project. Used to assign process responsibilities in workflows and to resolve who must act at each workflow step.')
 
 export type Role = z.infer<typeof RoleSchema>
 
@@ -68,7 +68,7 @@ export const MemberSchema = z.object({
   roleId: z.string(),
   description: z.string().optional(),
   bepEditor: z.boolean().optional(),
-})
+}).describe('A project participant identified by email. Each member holds one role, which determines their responsibilities across workflow steps.')
 
 export type Member = z.infer<typeof MemberSchema>
 
@@ -82,7 +82,7 @@ export const TeamBaseSchema = z.object({
   representativeEmail: z.email().optional()
     .describe('ref Member.email'),
   memberEmails: z.array(z.email()).optional(),
-})
+}).describe('A company or discipline group participating in the project. Teams group members under an ISO role and can be assigned RACI responsibilities at the workflow level.')
 
 export const TeamSchema = TeamBaseSchema
   .refine(t => !t.representativeEmail || (t.memberEmails ?? []).includes(t.representativeEmail), {
@@ -115,7 +115,7 @@ export type NamingSegment = z.infer<typeof NamingSegmentSchema>
 export const NamingConventionSchema = z.object({
   delimiter: z.string().min(1),
   segments:  z.array(NamingSegmentSchema).min(1),
-})
+}).describe('A structured rule for generating deliverable names. Specifies a delimiter and a sequence of segments that are joined to produce consistent, parseable file names.')
   .refine(c => c.segments.filter(s => s.type === 'sequence').length <= 1, {
     message: 'segments can contain at most one sequence.',
     path: ['segments'],
@@ -129,7 +129,7 @@ export const PhaseSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
-})
+}).describe('A project lifecycle stage used to organize milestones and deliverables.')
 
 export type Phase = z.infer<typeof PhaseSchema>
 
@@ -139,7 +139,7 @@ export const MilestoneSchema = z.object({
   date: z.iso.date(),
   phaseId: z.string(),
   description: z.string().optional(),
-})
+}).describe('A named deadline within a phase. Anchors deliverables and information requirements to a specific date in the project timeline.')
 
 export type Milestone = z.infer<typeof MilestoneSchema>
 
@@ -151,7 +151,7 @@ export const LBSNodeBaseSchema = z.object({
   description: z.string().optional(),
   lbsNodeIds: z.array(z.string()).optional()
     .describe('ref LBSNode.id[]'),
-})
+}).describe('A spatial or functional subdivision of the project. LBS nodes form a hierarchy that scopes deliverables to specific spatial or functional areas.')
 
 export const LBSNodeSchema = LBSNodeBaseSchema
   .refine(n => !(n.lbsNodeIds ?? []).includes(n.id), {
@@ -165,7 +165,7 @@ export const DisciplineSchema = z.object({
   id: z.string().min(1)
     .describe('Used in deliverables nomenclature.'),
   name: z.string().min(1),
-})
+}).describe('A project discipline used to classify deliverables and information requirements. Represents a technical domain such as structure, architecture, or MEP.')
 
 export type Discipline = z.infer<typeof DisciplineSchema>
 
@@ -174,7 +174,7 @@ export type Discipline = z.infer<typeof DisciplineSchema>
 export const ExtensionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-})
+}).describe('A file format or extension accepted for deliverables, such as IFC, PDF, or DWG. Used to specify the required output formats per deliverable.')
 
 export type Extension = z.infer<typeof ExtensionSchema>
 
@@ -183,7 +183,7 @@ export const AssetTypeSchema = z.object({
     .describe('Used in deliverables nomenclature.'),
   name: z.string().min(1),
   extensionIds: z.array(z.string()).optional(),
-})
+}).describe('A category of digital asset. Identifies the kind of information container — model, drawing, specification, etc. — independently of how it is used in the project.')
 
 export type AssetType = z.infer<typeof AssetTypeSchema>
 
@@ -194,7 +194,7 @@ export const SoftwareSchema = z.object({
   description: z.string().optional(),
   assetTypeIds: z.array(z.string()).optional(),
   url: z.string().optional(),
-})
+}).describe('A specific software application used by the project team. Linked to the asset types it produces and the BIM uses or actions that rely on it.')
 
 export type Software = z.infer<typeof SoftwareSchema>
 
@@ -203,7 +203,7 @@ export type Software = z.infer<typeof SoftwareSchema>
 export const ObjectiveSchema = z.object({
   id: z.uuid(),
   description: z.string().min(1),
-})
+}).describe('A stated reason for using BIM on this project. Objectives are the root of the BEP — all BIM uses, workflows, and deliverables must serve at least one.')
 
 export type Objective = z.infer<typeof ObjectiveSchema>
 
@@ -223,7 +223,7 @@ export const BIMUseSchema = z.object({
   software: BIMUseSoftwareSchema.optional(),
   milestoneIds: z.array(z.string()).optional(),
   workflowIds: z.array(z.string()).optional(),
-})
+}).describe('A specific application of BIM that serves one or more project objectives. Links intent to execution by connecting objectives, workflows, and milestones.')
 
 export type BIMUse = z.infer<typeof BIMUseSchema>
 
@@ -235,7 +235,7 @@ export const ActionSchema = z.object({
   description: z.string().optional(),
   softwareIds: z.array(z.string()).optional().describe('ref Software.id[]'),
   guideIds: z.array(z.string()).optional().describe('ref Guide.id[]'),
-})
+}).describe('A human-performed activity referenced by workflow process nodes. Actions represent what a person in a given role does at a specific step.')
 
 export type Action = z.infer<typeof ActionSchema>
 
@@ -253,7 +253,7 @@ export const FlowEventSchema = z.object({
   id:      z.string().min(1).describe('Human-readable slug, e.g. "status-changed".'),
   name:    z.string().min(1),
   payload: z.array(FlowPayloadFieldSchema).optional(),
-})
+}).describe('A signal that advances a workflow instance from one node to the next. Carries a typed payload that moves the workflow instance forward and can be evaluated by decision guards.')
 
 export type FlowEvent = z.infer<typeof FlowEventSchema>
 
@@ -262,7 +262,7 @@ export const FlowEffectSchema = z.object({
   name:        z.string().min(1),
   description: z.string().optional(),
   payload:     z.array(FlowPayloadFieldSchema).optional(),
-})
+}).describe('A fire-and-forget side effect triggered on a workflow edge. Executed by the runtime when the edge is traversed, using fields from the instance context as payload.')
 
 export type FlowEffect = z.infer<typeof FlowEffectSchema>
 
@@ -274,7 +274,7 @@ export const FlowAutomationSchema = z.object({
     .describe('Fields consumed from instance context and passed to the handler.'),
   output:      z.array(FlowPayloadFieldSchema)
     .describe('Fields the handler must return. Guards on outgoing edges reference these.'),
-})
+}).describe('A system-executed node in a workflow. Runs a handler automatically, produces a typed output, and must be followed by a decision node that branches on that output.')
 
 export type FlowAutomation = z.infer<typeof FlowAutomationSchema>
 
@@ -283,7 +283,7 @@ export type FlowAutomation = z.infer<typeof FlowAutomationSchema>
 export const NodeTimeoutSchema = z.object({
   hours:    z.number().positive(),
   effectId: z.string().min(1).describe('ref FlowEffect.id'),
-})
+}).describe('A time-based escalation on a process or automation node. Fires a declared effect if the node has not been advanced within the given number of hours.')
 
 export type NodeTimeout = z.infer<typeof NodeTimeoutSchema>
 
@@ -358,7 +358,7 @@ export const FlowNodeSchema = z.union([
   FlowDecisionNodeSchema,
   FlowAutomationNodeSchema,
   FlowProcessNodeSchema,
-])
+]).describe('A node in a workflow diagram used to describe steps.')
 
 export type FlowStartNode      = z.infer<typeof FlowStartNodeSchema>
 export type FlowEndNode        = z.infer<typeof FlowEndNodeSchema>
@@ -518,7 +518,7 @@ export const FlowDiagramSchema = z.object({
       })
     }
   }
-})
+}).describe('The visual and structural definition of a workflow.')
 
 export type FlowDiagram = z.infer<typeof FlowDiagramSchema>
 
@@ -528,9 +528,9 @@ export const WorkflowSchema = z.object({
   description: z.string().optional(),
   example: z.string().optional(),
   trackedAssetTypeId: z.string().optional()
-    .describe('ref AssetType.id — the asset type this workflow operates on.'),
+    .describe('ref AssetType.id'),
   diagram: FlowDiagramSchema,
-})
+}).describe('A reusable process definition associated with one or more BIM uses. Describes the ordered steps, responsibilities, and transitions that govern how work is carried out.')
 
 export type Workflow = z.infer<typeof WorkflowSchema>
 
@@ -542,7 +542,7 @@ export const AnnexSchema = z.object({
   type: AnnexType,
   url: z.string().min(1),
   description: z.string().optional(),
-})
+}).describe('Supporting material attached to the BEP, such as a reference document or instructional video.')
 
 export type Annex = z.infer<typeof AnnexSchema>
 
@@ -551,7 +551,7 @@ export const GuideSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().describe("Short guide description, not it's content"),
   annexIds: z.array(z.string()).optional(),
-})
+}).describe('A how-to reference included in the BEP. Groups related annexes and provides direction on how specific tasks or standards should be applied.')
 
 export type Guide = z.infer<typeof GuideSchema>
 
@@ -563,7 +563,7 @@ export const StandardSchema = z.object({
   description: z.string().optional(),
   contentPath: z.string()
     .describe('Relative path to the .md file inside the .bep archive.'),
-})
+}).describe('A normative reference or rule that governs how work is carried out on the project. Standards define what must be followed, as opposed to guides which explain how.')
 
 export type Standard = z.infer<typeof StandardSchema>
 
@@ -573,7 +573,7 @@ export const LODSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   checklist: z.array(z.string()).optional(),
-})
+}).describe('A geometric detail level assigned to model elements in LOIN requirements. Specifies the geometric precision required of a model element at a given milestone.')
 
 export type LOD = z.infer<typeof LODSchema>
 
@@ -581,7 +581,7 @@ export const LOISchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   checklist: z.array(z.string()).optional(),
-})
+}).describe('An information detail level assigned to model elements in LOIN requirements. Specifies the non-geometric properties required of a model element at a given milestone.')
 
 export type LOI = z.infer<typeof LOISchema>
 
@@ -600,7 +600,7 @@ export const LOINSchema = z.object({
   element: z.string().min(1),
   disciplineId: z.string(),
   milestones: z.array(LOINMilestoneSchema).optional(),
-})
+}).describe('An information requirement for a model element. Declares what geometric detail and information properties are required for a specific model element and discipline across project milestones.')
 
 export type LOIN = z.infer<typeof LOINSchema>
 
@@ -611,7 +611,7 @@ export const NoteSchema = z.object({
   message: z.string().min(1),
   memberEmail: z.email(),
   createdAt: z.iso.datetime(),
-})
+}).describe('A timestamped comment left by a project member on the BEP.')
 
 export type Note = z.infer<typeof NoteSchema>
 
@@ -622,7 +622,7 @@ export const FlagBaseSchema = z.object({
   severity: FlagSeverity,
   message: z.string().min(1),
   generatedAt: z.iso.datetime(),
-})
+}).describe('A diagnostic message attached to the BEP or one of its entities. Indicates an issue or observation with a severity level that guides the author.')
 
 export const FlagSchema = FlagBaseSchema
   .refine(f => (f.entity === null) === (f.entityId === null), {
@@ -644,7 +644,7 @@ export const DeliverableBaseSchema = z.object({
   milestoneId:   z.string(),
   dueDate: z.iso.date().optional(),
   predecessorId: z.string().optional(),
-})
+}).describe('A formal output committed by a team at a milestone. Defines what must be delivered, in what format, by whom, and by when.')
 
 export const DeliverableSchema = DeliverableBaseSchema
   .refine(d => !d.predecessorId || d.predecessorId !== d.id, {
@@ -660,7 +660,7 @@ export const EnvVarSchema = z.object({
   key:         z.string().min(1).describe('Variable name referenced in effect handlers as config.KEY.'),
   description: z.string().optional(),
   secret:      z.boolean().optional().describe('If true, the value is masked in the UI after being saved.'),
-})
+}).describe('A runtime configuration entry for effect and automation handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them.')
 
 export type EnvVar = z.infer<typeof EnvVarSchema>
 
