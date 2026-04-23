@@ -98,8 +98,8 @@ const wfAdded = bep.workflows.add([
       nodes: {
         start:  { type: 'start' },
         update: { type: 'process', actionId: actionUpdateId, responsibleRoleIds: [roleManagerId] },
-        review: { type: 'process', actionId: actionReviewId, accountableRoleIds: [roleManagerId] },
-        issues: { type: 'process', actionId: actionIssuesId, consultedRoleIds:   [roleManagerId] },
+        review: { type: 'process', actionId: actionReviewId, responsibleRoleIds: [roleManagerId], accountableRoleIds: [roleManagerId] },
+        issues: { type: 'process', actionId: actionIssuesId, responsibleRoleIds: [roleManagerId], consultedRoleIds:   [roleManagerId] },
         end:    { type: 'end' },
       },
       edges: {
