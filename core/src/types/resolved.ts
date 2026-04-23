@@ -61,9 +61,8 @@ export type SoftwareResolved = Omit<Software, 'assetTypeIds'> & {
   assetTypes: AssetTypeResolved[]
 }
 
-export type BIMUseResolved = Omit<BIMUse, 'objectiveIds' | 'software' | 'milestoneIds' | 'workflowIds'> & {
+export type BIMUseResolved = Omit<BIMUse, 'objectiveIds' | 'milestoneIds' | 'workflowIds'> & {
   objectives: Objective[]
-  software?: { description?: string; softwares: SoftwareResolved[] }
   milestones: MilestoneResolved[]
   workflows: WorkflowResolved[]
 }

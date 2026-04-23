@@ -114,7 +114,7 @@ export class Bep {
     this.events         = new Events(bep)
     this.effects        = new Effects(bep)
     this.automations    = new Automations(bep)
-    this.bimUses        = new BIMUses(bep, () => this.softwares, () => this.workflows)
+    this.bimUses        = new BIMUses(bep, () => this.workflows)
     this.disciplines    = new Disciplines(bep)
     this.guides         = new Guides(bep)
     this.lods           = new LODs(bep)

@@ -106,7 +106,8 @@
           "delimiter",
           "segments"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A structured rule for generating deliverable names. Specifies a delimiter and a sequence of segments that are joined to produce consistent, parseable file names."
       },
       "roles": {
         "type": "array",
@@ -134,7 +135,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Defines a stakeholder role in the project. Used to assign process responsibilities in workflows and to resolve who must act at each workflow step."
         }
       },
       "members": {
@@ -166,7 +168,8 @@
             "name",
             "roleId"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A project participant identified by email. Each member holds one role, which determines their responsibilities across workflow steps."
         }
       },
       "teams": {
@@ -220,7 +223,8 @@
             "name",
             "isoRole"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A company or discipline group participating in the project. Teams group members under an ISO role and can be assigned RACI responsibilities at the workflow level."
         }
       },
       "phases": {
@@ -244,7 +248,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A project lifecycle stage used to organize milestones and deliverables."
         }
       },
       "milestones": {
@@ -278,7 +283,8 @@
             "date",
             "phaseId"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A named deadline within a phase. Anchors deliverables and information requirements to a specific date in the project timeline."
         }
       },
       "lbs": {
@@ -318,7 +324,8 @@
             "name",
             "type"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A spatial or functional subdivision of the project. LBS nodes form a hierarchy that scopes deliverables to specific spatial or functional areas."
         }
       },
       "disciplines": {
@@ -340,7 +347,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A project discipline used to classify deliverables and information requirements. Represents a technical domain such as structure, architecture, or MEP."
         }
       },
       "extensions": {
@@ -361,7 +369,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A file format or extension accepted for deliverables, such as IFC, PDF, or DWG. Used to specify the required output formats per deliverable."
         }
       },
       "assetTypes": {
@@ -389,7 +398,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A category of digital asset. Identifies the kind of information container — model, drawing, specification, etc. — independently of how it is used in the project."
         }
       },
       "softwares": {
@@ -427,7 +437,8 @@
             "name",
             "version"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A specific software application used by the project team. Linked to the asset types it produces and the BIM uses or actions that rely on it."
         }
       },
       "objectives": {
@@ -449,7 +460,8 @@
             "id",
             "description"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A stated reason for using BIM on this project. Objectives are the root of the BEP — all BIM uses, workflows, and deliverables must serve at least one."
         }
       },
       "bimUses": {
@@ -475,25 +487,6 @@
                 "type": "string"
               }
             },
-            "software": {
-              "type": "object",
-              "properties": {
-                "description": {
-                  "type": "string"
-                },
-                "ids": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "ref Software.id[]"
-                }
-              },
-              "required": [
-                "ids"
-              ],
-              "additionalProperties": false
-            },
             "milestoneIds": {
               "type": "array",
               "items": {
@@ -511,7 +504,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A specific application of BIM that serves one or more project objectives. Links intent to execution by connecting objectives, workflows, and milestones."
         }
       },
       "actions": {
@@ -550,7 +544,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A human-performed activity referenced by workflow process nodes. Actions represent what a person in a given role does at a specific step."
         }
       },
       "events": {
@@ -602,7 +597,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A signal that advances a workflow instance from one node to the next. Carries a typed payload that moves the workflow instance forward and can be evaluated by decision guards."
         }
       },
       "effects": {
@@ -657,7 +653,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A fire-and-forget side effect triggered on a workflow edge. Executed by the runtime when the edge is traversed, using fields from the instance context as payload."
         }
       },
       "automations": {
@@ -745,7 +742,8 @@
             "name",
             "output"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A system-executed node in a workflow. Runs a handler automatically, produces a typed output, and must be followed by a decision node that branches on that output."
         }
       },
       "env": {
@@ -769,7 +767,8 @@
           "required": [
             "key"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A runtime configuration entry for effect and automation handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them."
         }
       },
       "workflows": {
@@ -793,7 +792,7 @@
               "type": "string"
             },
             "trackedAssetTypeId": {
-              "description": "ref AssetType.id — the asset type this workflow operates on.",
+              "description": "ref AssetType.id",
               "type": "string"
             },
             "diagram": {
@@ -889,7 +888,8 @@
                                 "hours",
                                 "effectId"
                               ],
-                              "additionalProperties": false
+                              "additionalProperties": false,
+                              "description": "A time-based escalation on a process or automation node. Fires a declared effect if the node has not been advanced within the given number of hours."
                             }
                           }
                         },
@@ -1021,7 +1021,8 @@
                                 "hours",
                                 "effectId"
                               ],
-                              "additionalProperties": false
+                              "additionalProperties": false,
+                              "description": "A time-based escalation on a process or automation node. Fires a declared effect if the node has not been advanced within the given number of hours."
                             }
                           }
                         },
@@ -1030,7 +1031,8 @@
                         ],
                         "additionalProperties": false
                       }
-                    ]
+                    ],
+                    "description": "A node in a workflow diagram used to describe steps."
                   }
                 },
                 "edges": {
@@ -1182,7 +1184,8 @@
                 "nodes",
                 "edges"
               ],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "The visual and structural definition of a workflow."
             }
           },
           "required": [
@@ -1190,7 +1193,8 @@
             "name",
             "diagram"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A reusable process definition associated with one or more BIM uses. Describes the ordered steps, responsibilities, and transitions that govern how work is carried out."
         }
       },
       "guides": {
@@ -1222,7 +1226,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A how-to reference included in the BEP. Groups related annexes and provides direction on how specific tasks or standards should be applied."
         }
       },
       "annexes": {
@@ -1260,7 +1265,8 @@
             "type",
             "url"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Supporting material attached to the BEP, such as a reference document or instructional video."
         }
       },
       "standards": {
@@ -1290,7 +1296,8 @@
             "name",
             "contentPath"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A normative reference or rule that governs how work is carried out on the project. Standards define what must be followed, as opposed to guides which explain how."
         }
       },
       "lods": {
@@ -1317,7 +1324,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A geometric detail level assigned to model elements in LOIN requirements. Specifies the geometric precision required of a model element at a given milestone."
         }
       },
       "lois": {
@@ -1344,7 +1352,8 @@
             "id",
             "name"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "An information detail level assigned to model elements in LOIN requirements. Specifies the non-geometric properties required of a model element at a given milestone."
         }
       },
       "loin": {
@@ -1399,7 +1408,8 @@
             "element",
             "disciplineId"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "An information requirement for a model element. Declares what geometric detail and information properties are required for a specific model element and discipline across project milestones."
         }
       },
       "deliverables": {
@@ -1452,7 +1462,8 @@
             "responsibleId",
             "milestoneId"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A formal output committed by a team at a milestone. Defines what must be delivered, in what format, by whom, and by when."
         }
       },
       "notes": {
@@ -1486,7 +1497,8 @@
             "memberEmail",
             "createdAt"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A timestamped comment left by a project member on the BEP."
         }
       },
       "flags": {
@@ -1569,7 +1581,8 @@
             "message",
             "generatedAt"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "A diagnostic message attached to the BEP or one of its entities. Indicates an issue or observation with a severity level that guides the author."
         }
       }
     },

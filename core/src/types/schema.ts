@@ -207,20 +207,11 @@ export const ObjectiveSchema = z.object({
 
 export type Objective = z.infer<typeof ObjectiveSchema>
 
-export const BIMUseSoftwareSchema = z.object({
-  description: z.string().optional(),
-  ids: z.array(z.string())
-    .describe('ref Software.id[]'),
-})
-
-export type BIMUseSoftware = z.infer<typeof BIMUseSoftwareSchema>
-
 export const BIMUseSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
   objectiveIds: z.array(z.string()).optional(),
-  software: BIMUseSoftwareSchema.optional(),
   milestoneIds: z.array(z.string()).optional(),
   workflowIds: z.array(z.string()).optional(),
 }).describe('A specific application of BIM that serves one or more project objectives. Links intent to execution by connecting objectives, workflows, and milestones.')

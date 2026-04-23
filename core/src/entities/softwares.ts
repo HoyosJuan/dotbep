@@ -12,12 +12,6 @@ export class Softwares extends Entity<Software> {
       {
         key: 'softwares',
         schema: SoftwareSchema,
-        beforeRemove: (id, bep) => {
-          for (const bu of bep.bimUses) {
-            if (bu.software?.ids.includes(id))
-              throw new Error(`Referenced by: bimUses["${bu.id}"].software.ids`)
-          }
-        },
       },
     )
   }
