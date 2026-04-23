@@ -10,10 +10,10 @@
   ],
   "scripts": {
     "example": "npm run example -w @dotbep/core",
-    "build:core": "npm run build -w @dotbep/core && node --experimental-strip-types scripts/gen-schema.ts",
-    "build": "npm run build:core",
-    "publish:core": "npm publish -w @dotbep/core",
-    "schema": "node --experimental-strip-types scripts/gen-schema.ts"
+    "build:core": "npm run build -w @dotbep/core",
+    "build:schema": "node --experimental-strip-types scripts/gen-schema.ts",
+    "build": "npm run build:core && npm run build:schema",
+    "publish": "npm publish -w @dotbep/core"
   },
   "devDependencies": {
     "typescript": "~5.9.3"
