@@ -517,7 +517,7 @@ export const WorkflowSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
-  example: z.string().optional(),
+  example: z.string().optional().describe("Narrative example showcasing one cycle of this workflow."),
   trackedAssetTypeId: z.string().optional()
     .describe('ref AssetType.id'),
   diagram: FlowDiagramSchema,
