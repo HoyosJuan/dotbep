@@ -189,6 +189,17 @@ export type EffectHandler = (
 ) => Promise<void>
 
 /**
+ * Handler registered for a specific Resolver.id.
+ * Fetches and transforms data from an external source, returning a raw payload
+ * for the lens to render. Never handles authentication tokens directly —
+ * credentials are passed via env.
+ */
+export type ResolverHandler = (
+  url: string,
+  env: Record<string, string>,
+) => Promise<unknown>
+
+/**
  * Handler for an automation node. Receives the instance and the payload filtered
  * from instance.context according to FlowAutomation.payload. Must return an object
  * with an eventId matching the FlowEvent declared on the outgoing edge, plus any

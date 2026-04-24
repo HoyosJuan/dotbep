@@ -1,4 +1,4 @@
-import type { WorkflowInstance, EffectHandler, AutomationHandler } from './types.js'
+import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler } from './types.js'
 
 export interface BepTypes {
   effects:     Record<string, Record<string, unknown>>
@@ -51,6 +51,7 @@ export class Runtime<T extends {
 
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
+  readonly resolvers:   Record<string, ResolverHandler>   = {}
 
   constructor({ env = {} }: RuntimeOptions = {}) {
     this.env = env
@@ -71,7 +72,12 @@ export class Runtime<T extends {
     this.automations[key] = handler as AutomationHandler
     return this
   }
+
+  protected resolver(key: string, handler: ResolverHandler): this {
+    this.resolvers[key] = handler
+    return this
+  }
 }
 
 // Untyped aliases used internally by Engine (which works with the base contract)
-export type { EffectHandler, AutomationHandler }
+export type { EffectHandler, AutomationHandler, ResolverHandler }
