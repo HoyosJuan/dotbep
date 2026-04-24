@@ -28,5 +28,7 @@ export function normalizeBep(bep: BEP): BEP {
   bep.flags          ??= []
   bep.env            ??= []
   bep.automations    ??= []
+  bep.resolvers      ??= []
+  bep.liveResources  ??= []
   return bep
 }

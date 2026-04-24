@@ -655,6 +655,28 @@ export const EnvVarSchema = z.object({
 
 export type EnvVar = z.infer<typeof EnvVarSchema>
 
+// ─── Live Resources ───────────────────────────────────────────────────────────
+
+export const ResolverSchema = z.object({
+  id:          z.string().min(1).describe('Human-readable slug, e.g. "google-sheet"'),
+  name:        z.string().min(1),
+  description: z.string().optional(),
+  envKeys:     z.array(z.string().min(1)).describe('ref EnvVar.key[] — env vars required by this resolver handler.'),
+}).describe('A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource.')
+
+export type Resolver = z.infer<typeof ResolverSchema>
+
+export const LiveResourceSchema = z.object({
+  id:          z.uuid(),
+  name:        z.string().min(1),
+  description: z.string().optional(),
+  url:         z.url(),
+  resolverId:  z.string().min(1).describe('ref Resolver.id'),
+  lensId:      z.string().min(1),
+}).describe('A reference to an external data source that is fetched at runtime and rendered by a lens. The BEP does not store the data — it only declares where it lives and how to access and display it.')
+
+export type LiveResource = z.infer<typeof LiveResourceSchema>
+
 // ─── BEP Root ─────────────────────────────────────────────────────────────────
 
 export const BEPSchema = z.object({
@@ -677,6 +699,8 @@ export const BEPSchema = z.object({
   effects:         z.array(FlowEffectSchema),
   automations:     z.array(FlowAutomationSchema),
   env:             z.array(EnvVarSchema),
+  resolvers:       z.array(ResolverSchema),
+  liveResources:   z.array(LiveResourceSchema),
   workflows:       z.array(WorkflowSchema),
   guides:          z.array(GuideSchema),
   annexes:         z.array(AnnexSchema),

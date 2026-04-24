@@ -237,7 +237,7 @@ export class Bep {
       flags: [],
       env: [],
       automations: [],
-    } as BEP)
+    } as unknown as BEP)
     const zip = new JSZip()
     // Initialize required files so the zip is fully functional from the start.
     // changelog.json is omitted — commit() creates it. The v0.0 terminus is the
