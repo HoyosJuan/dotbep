@@ -21,6 +21,11 @@ export interface EngineInitConfig {
   runtime: Runtime<any>
   /** Storage backend for workflow instances. Defaults to in-memory. */
   storage?: InstanceStore
+  /** Event-processing options. */
+  events?: {
+    /** Skip RACI authorization checks on emit(). Intended for local testing only. */
+    skipRaci?: boolean
+  }
 }
 
 /**
@@ -44,8 +49,9 @@ export class Engine {
   private readonly getHistoricalBep?: (version: string) => Promise<BEP>
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private runtime!:  Runtime<any>
-  private storage!:  InstanceStore
+  private runtime!:   Runtime<any>
+  private storage!:   InstanceStore
+  private skipRaci =  false
 
   private readonly transitionListeners:   TransitionListener[]   = []
   private readonly createdListeners:      LifecycleListener[]    = []
@@ -67,8 +73,9 @@ export class Engine {
    * Returns `this` for chaining.
    */
   init(config: EngineInitConfig): this {
-    this.runtime = config.runtime
-    this.storage = config.storage ?? new MemoryStorage()
+    this.runtime  = config.runtime
+    this.storage  = config.storage ?? new MemoryStorage()
+    this.skipRaci = config.events?.skipRaci ?? false
     return this
   }
 
@@ -141,8 +148,8 @@ export class Engine {
     if (!instance) return { ok: false, error: 'NO_MATCHING_EDGE' }
 
     const bep = await this._resolveBep(instance.bepVersion)
-    let result = processEvent(bep, instance, event)
-    if (!result.ok) return { ok: false, error: result.error }
+    let result = processEvent(bep, instance, event, { skipRaci: this.skipRaci })
+    if (!result.ok) return { ok: false, error: result.error, payloadErrors: result.payloadErrors }
 
     const allTransitions = [...(result.transitionsApplied ?? [])]
     const allEffects:     EffectOutcome[] = []

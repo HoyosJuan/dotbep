@@ -13,6 +13,7 @@ import type {
   RaciLevel,
   ProcessEventError,
   TransitionStep,
+  PayloadFieldError,
 } from './types.js'
 
 // Safety limit to prevent infinite loops in malformed decision chains.
@@ -37,6 +38,77 @@ export function evaluateGuard(guard: EdgeGuard, payload: Record<string, unknown>
   }
 }
 
+// ─── Authorization ────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the actor satisfies the R or A constraints of a process node.
+ * If no R or A is defined, the node is open to anyone.
+ */
+function isActorAuthorized(bep: BEP, nodeId: string, workflowId: string, actorEmail: string): boolean {
+  const workflow = bep.workflows.find(w => w.id === workflowId)
+  const node = workflow?.diagram.nodes[nodeId]
+  if (!node || node.type !== 'process') return true
+
+  const hasResponsible = !!(node.responsibleRoleIds?.length || node.responsibleTeamIds?.length || node.responsibleEmails?.length)
+  const hasAccountable = !!(node.accountableRoleIds?.length || node.accountableTeamIds?.length || node.accountableEmails?.length)
+  if (!hasResponsible && !hasAccountable) return true
+
+  const member     = bep.members.find(m => m.email === actorEmail)
+  const actorRoleId = member?.roleId
+  const actorTeamIds = new Set(bep.teams.filter(t => (t.memberEmails ?? []).includes(actorEmail)).map(t => t.id))
+
+  const matches = (roleIds?: string[], teamIds?: string[], emails?: string[]): boolean => {
+    if (emails?.includes(actorEmail)) return true
+    const hasRoles = !!roleIds?.length
+    const hasTeams = !!teamIds?.length
+    if (hasTeams && hasRoles)
+      return !!actorRoleId && roleIds!.includes(actorRoleId) && teamIds!.some(tid => actorTeamIds.has(tid))
+    if (hasTeams) return teamIds!.some(tid => actorTeamIds.has(tid))
+    if (hasRoles) return !!actorRoleId && roleIds!.includes(actorRoleId)
+    return false
+  }
+
+  return (
+    (hasResponsible && matches(node.responsibleRoleIds, node.responsibleTeamIds, node.responsibleEmails)) ||
+    (hasAccountable && matches(node.accountableRoleIds, node.accountableTeamIds, node.accountableEmails))
+  )
+}
+
+// ─── Payload validation ───────────────────────────────────────────────────────
+
+const JS_TYPE: Record<string, string> = { string: 'string', number: 'number', boolean: 'boolean' }
+
+function validatePayload(
+  bep: BEP,
+  eventId: string,
+  payload: Record<string, unknown> | undefined,
+): PayloadFieldError[] {
+  const def = bep.events.find(e => e.id === eventId)
+  if (!def?.payload?.length) return []
+
+  const errors: PayloadFieldError[] = []
+  const incoming = payload ?? {}
+
+  for (const field of def.payload) {
+    const val = incoming[field.key]
+    if (val === undefined || val === null) {
+      if (field.required) errors.push({ field: field.key, reason: 'missing' })
+    } else {
+      const expected = JS_TYPE[field.type]
+      if (expected && typeof val !== expected) {
+        errors.push({ field: field.key, reason: 'wrong_type' })
+      }
+    }
+  }
+
+  const declaredKeys = new Set(def.payload.map(f => f.key))
+  for (const key of Object.keys(incoming)) {
+    if (!declaredKeys.has(key)) errors.push({ field: key, reason: 'unknown_field' })
+  }
+
+  return errors
+}
+
 // ─── Edge matching ────────────────────────────────────────────────────────────
 
 function edgeMatchesEvent(edge: FlowEdge, event: IncomingEvent): boolean {
@@ -59,6 +131,8 @@ export interface ProcessEventResult {
   /** Present when the final node is an automation node — Engine must execute the automation then emit the returned eventId. */
   automationNodePending?: { nodeId: string; automationId: string }
   error?: ProcessEventError
+  /** Present when error = 'INVALID_PAYLOAD'. */
+  payloadErrors?: PayloadFieldError[]
 }
 
 // ─── Create instance ──────────────────────────────────────────────────────────
@@ -127,9 +201,14 @@ export function processEvent(
   bep: BEP,
   instance: WorkflowInstance,
   event: IncomingEvent,
+  options?: { skipRaci?: boolean },
 ): ProcessEventResult {
   if (instance.status !== 'active') {
     return { ok: false, error: 'INSTANCE_NOT_ACTIVE' }
+  }
+
+  if (!options?.skipRaci && !isActorAuthorized(bep, instance.currentNodeId, instance.workflowId, event.actor)) {
+    return { ok: false, error: 'UNAUTHORIZED' }
   }
 
   const workflow = bep.workflows.find(w => w.id === instance.workflowId)
@@ -154,6 +233,11 @@ export function processEvent(
   if (candidates.length > 1)   return { ok: false, error: 'AMBIGUOUS_TRANSITION' }
 
   const [edgeId, edge] = candidates[0]!
+
+  if ('triggerEventId' in edge) {
+    const payloadErrors = validatePayload(bep, edge.triggerEventId, event.payload)
+    if (payloadErrors.length > 0) return { ok: false, error: 'INVALID_PAYLOAD', payloadErrors }
+  }
 
   context = { ...context, ...event.payload }
   newHistory.push(buildTransitionEvent(edgeId, currentNodeId, edge.to, event, context))

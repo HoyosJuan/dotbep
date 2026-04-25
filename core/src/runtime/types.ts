@@ -17,7 +17,7 @@ export interface IncomingEvent {
   /** Member.email of the person or system acting. */
   actor: string
   /** Key-value payload validated against FlowEvent.payload definition. */
-  payload: Record<string, unknown>
+  payload?: Record<string, unknown>
 }
 
 // ─── Transition log ───────────────────────────────────────────────────────────
@@ -169,6 +169,13 @@ export type ProcessEventError =
   | 'NO_MATCHING_EDGE'
   | 'AMBIGUOUS_TRANSITION'
   | 'DECISION_LOOP'
+  | 'UNAUTHORIZED'
+  | 'INVALID_PAYLOAD'
+
+export interface PayloadFieldError {
+  field: string
+  reason: 'missing' | 'wrong_type' | 'unknown_field'
+}
 
 export interface TransitionStep {
   edgeId: string
@@ -228,6 +235,8 @@ export interface EventResult {
   transitionsApplied?: TransitionStep[]
   effects?: EffectOutcome[]
   error?: ProcessEventError
+  /** Present when error = 'INVALID_PAYLOAD'. */
+  payloadErrors?: PayloadFieldError[]
 }
 
 // ─── Lifecycle listeners ──────────────────────────────────────────────────────

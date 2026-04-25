@@ -771,6 +771,83 @@
           "description": "A runtime configuration entry for effect and automation handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them."
         }
       },
+      "resolvers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable slug, e.g. \"google-sheet\""
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "envKeys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "ref EnvVar.key[] — env vars required by this resolver handler."
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "envKeys"
+          ],
+          "additionalProperties": false,
+          "description": "A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource."
+        }
+      },
+      "liveResources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "resolverId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "ref Resolver.id"
+            },
+            "lensId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "url",
+            "resolverId",
+            "lensId"
+          ],
+          "additionalProperties": false,
+          "description": "A reference to an external data source that is fetched at runtime and rendered by a lens. The BEP does not store the data — it only declares where it lives and how to access and display it."
+        }
+      },
       "workflows": {
         "type": "array",
         "items": {
@@ -789,6 +866,7 @@
               "type": "string"
             },
             "example": {
+              "description": "Narrative example showcasing one cycle of this workflow.",
               "type": "string"
             },
             "trackedAssetTypeId": {
@@ -1605,6 +1683,8 @@
       "effects",
       "automations",
       "env",
+      "resolvers",
+      "liveResources",
       "workflows",
       "guides",
       "annexes",
