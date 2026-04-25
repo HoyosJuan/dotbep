@@ -188,7 +188,7 @@ export const AssetTypeSchema = z.object({
 export type AssetType = z.infer<typeof AssetTypeSchema>
 
 export const SoftwareSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).regex(/^[^:]+$/),
   name: z.string().min(1),
   version: z.string().min(1),
   description: z.string().optional(),
