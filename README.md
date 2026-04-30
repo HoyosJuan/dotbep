@@ -47,10 +47,6 @@ project.bep
 │   └── standards/
 │       └── {standard-id}/
 │           └── v0.3.md               ← .md snapshot only if it changed in that version
-├── ids/
-│   └── walls-detailed-design.ids
-├── ids-reports/
-│   └── walls-detailed-design-report.html
 ├── standards/
 │   └── {uuid}.md
 ├── guides/
