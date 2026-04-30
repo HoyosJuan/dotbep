@@ -1,8 +1,10 @@
+![dotBEP](resources/dotbep_github_banner.png)
+
 # dotBEP
 
 ## What is this?
 
-An open .bep **data format designed to author BIM Execution Plans (BEPs)**. Its used to define and distribute a BIM Execution Plan programmatically. The goal is to replace text-based BEPs with a structured data format that enables:
+An open .bep **data format designed to author and run BIM Execution Plans (BEPs)**. The goal is to replace text-based BEPs with a structured data format that enables:
 
 - Integration with AI agents to manage the BEP in natural language.
 - Dynamic and custom frontends for navigating BEPs.
