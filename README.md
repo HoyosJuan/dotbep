@@ -84,6 +84,20 @@ project.bep
 
 ---
 
+## Examples
+
+Clone the repo, install dependencies, and run all examples:
+
+```bash
+git clone https://github.com/HoyosJuan/dotbep.git
+npm install
+npm run example
+```
+
+Each example in [`core/examples/`](./core/examples) covers a specific area of the schema: participants, workflows, standards, history, and more.
+
+---
+
 ## Documentation
 
 Detailed documentation for the format and schema lives in [`docs/`](./docs):
