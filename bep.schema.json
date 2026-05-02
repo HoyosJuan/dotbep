@@ -1527,6 +1527,10 @@
             "predecessorId": {
               "type": "string"
             },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
             "resolverId": {
               "type": "string",
               "minLength": 1
