@@ -409,7 +409,8 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "^[^:]+$"
             },
             "name": {
               "type": "string",
@@ -806,7 +807,7 @@
           "description": "A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource."
         }
       },
-      "liveResources": {
+      "remoteData": {
         "type": "array",
         "items": {
           "type": "object",
@@ -828,11 +829,7 @@
               "format": "uri"
             },
             "resolverId": {
-              "type": "string",
-              "minLength": 1,
-              "description": "ref Resolver.id"
-            },
-            "lensId": {
+              "description": "ref Resolver.id",
               "type": "string",
               "minLength": 1
             }
@@ -840,12 +837,10 @@
           "required": [
             "id",
             "name",
-            "url",
-            "resolverId",
-            "lensId"
+            "url"
           ],
           "additionalProperties": false,
-          "description": "A reference to an external data source that is fetched at runtime and rendered by a lens. The BEP does not store the data — it only declares where it lives and how to access and display it."
+          "description": "A reference to an external data source that is fetched at runtime. The BEP does not store the data — it only declares where it lives and how to access it using a resolver."
         }
       },
       "workflows": {
@@ -1531,6 +1526,10 @@
             },
             "predecessorId": {
               "type": "string"
+            },
+            "resolverId": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -1684,7 +1683,7 @@
       "automations",
       "env",
       "resolvers",
-      "liveResources",
+      "remoteData",
       "workflows",
       "guides",
       "annexes",
