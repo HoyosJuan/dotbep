@@ -635,6 +635,7 @@ export const DeliverableBaseSchema = z.object({
   milestoneId:   z.string(),
   dueDate: z.iso.date().optional(),
   predecessorId: z.string().optional(),
+  resolverId: z.string().min(1).optional(),
 }).describe('A formal output committed by a team at a milestone. Defines what must be delivered, in what format, by whom, and by when.')
 
 export const DeliverableSchema = DeliverableBaseSchema
@@ -655,7 +656,7 @@ export const EnvVarSchema = z.object({
 
 export type EnvVar = z.infer<typeof EnvVarSchema>
 
-// ─── Live Resources ───────────────────────────────────────────────────────────
+// ─── Remote Data ────────────────────────────────────────────────────────
 
 export const ResolverSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "google-sheet"'),
@@ -666,16 +667,15 @@ export const ResolverSchema = z.object({
 
 export type Resolver = z.infer<typeof ResolverSchema>
 
-export const LiveResourceSchema = z.object({
+export const RemoteDataSchema = z.object({
   id:          z.uuid(),
   name:        z.string().min(1),
   description: z.string().optional(),
   url:         z.url(),
-  resolverId:  z.string().min(1).describe('ref Resolver.id'),
-  lensId:      z.string().min(1),
-}).describe('A reference to an external data source that is fetched at runtime and rendered by a lens. The BEP does not store the data — it only declares where it lives and how to access and display it.')
+  resolverId:  z.string().min(1).optional().describe('ref Resolver.id'),
+}).describe('A reference to an external data source that is fetched at runtime. The BEP does not store the data — it only declares where it lives and how to access it using a resolver.')
 
-export type LiveResource = z.infer<typeof LiveResourceSchema>
+export type RemoteData = z.infer<typeof RemoteDataSchema>
 
 // ─── BEP Root ─────────────────────────────────────────────────────────────────
 
@@ -700,7 +700,7 @@ export const BEPSchema = z.object({
   automations:     z.array(FlowAutomationSchema),
   env:             z.array(EnvVarSchema),
   resolvers:       z.array(ResolverSchema),
-  liveResources:   z.array(LiveResourceSchema),
+  remoteData: z.array(RemoteDataSchema),
   workflows:       z.array(WorkflowSchema),
   guides:          z.array(GuideSchema),
   annexes:         z.array(AnnexSchema),
