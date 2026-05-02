@@ -126,7 +126,7 @@ export class Engine {
     for (const ef of startEffects) {
       await this._executeEffect(instance, ef)
     }
-    await this.storage.saveInstance(bep.project.code, instance)
+    await this.storage.saveInstance(instance)
     await this._fire(this.createdListeners, instance)
     return instance
   }
@@ -144,7 +144,7 @@ export class Engine {
    */
   async emit(instanceId: string, event: IncomingEvent): Promise<EventResult> {
     this._assertInit()
-    const instance = await this.storage.getInstance(this.getBep().project.code, instanceId)
+    const instance = await this.storage.getInstance(instanceId)
     if (!instance) return { ok: false, error: 'NO_MATCHING_EDGE' }
 
     const bep = await this._resolveBep(instance.bepVersion)
@@ -183,7 +183,7 @@ export class Engine {
       }
     }
 
-    await this.storage.saveInstance(bep.project.code, current)
+    await this.storage.saveInstance(current)
 
     await this._fire(this.transitionListeners, current, allTransitions, allEffects)
     if (current.status === 'completed') {
@@ -202,7 +202,7 @@ export class Engine {
 
   async getInstance(instanceId: string): Promise<WorkflowInstance | null> {
     this._assertInit()
-    return this.storage.getInstance(this.getBep().project.code, instanceId)
+    return this.storage.getInstance(instanceId)
   }
 
   /**
@@ -213,7 +213,7 @@ export class Engine {
   async getInstances(filter?: InstanceFilter): Promise<WorkflowInstance[]> {
     this._assertInit()
     const { pendingActionFor, ...storageFilter } = filter ?? {}
-    const instances = await this.storage.listInstances(this.getBep().project.code, storageFilter)
+    const instances = await this.storage.listInstances(storageFilter)
     if (!pendingActionFor) return instances
 
     const bep    = this.getBep()
@@ -240,7 +240,7 @@ export class Engine {
    */
   async getNodeConfig(instanceId: string, actorEmail: string): Promise<NodeConfig | null> {
     this._assertInit()
-    const instance = await this.storage.getInstance(this.getBep().project.code, instanceId)
+    const instance = await this.storage.getInstance(instanceId)
     if (!instance) return null
     const bep = await this._resolveBep(instance.bepVersion)
     return _getNodeConfig(bep, instance, actorEmail)
@@ -248,7 +248,7 @@ export class Engine {
 
   async deleteInstance(instanceId: string): Promise<void> {
     this._assertInit()
-    await this.storage.deleteInstance(this.getBep().project.code, instanceId)
+    await this.storage.deleteInstance(instanceId)
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────────

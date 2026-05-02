@@ -63,7 +63,6 @@ export interface WorkflowInstance {
      * Namespace that identifies where the asset lives.
      * Format: "bep:<entityName>" for BEP-internal entities (e.g. "bep:deliverables"),
      * or "external:<softwareId>" for assets in external systems (e.g. "external:software-acc").
-     * The entityName must match the corresponding key in bep.json and in MappingStorage.
      * The softwareId must match a Software.id declared in the BEP (which cannot contain colons).
      */
     source: string
@@ -269,21 +268,9 @@ export type EffectFailedListener = (
 
 /** Abstraction over where instances are persisted. */
 export interface InstanceStore {
-  listInstances(projectId: string, filter?: InstanceFilter): Promise<WorkflowInstance[]>
-  getInstance(projectId: string, instanceId: string): Promise<WorkflowInstance | null>
-  saveInstance(projectId: string, instance: WorkflowInstance): Promise<void>
-  deleteInstance(projectId: string, instanceId: string): Promise<void>
+  listInstances(filter?: InstanceFilter): Promise<WorkflowInstance[]>
+  getInstance(instanceId: string): Promise<WorkflowInstance | null>
+  saveInstance(instance: WorkflowInstance): Promise<void>
+  deleteInstance(instanceId: string): Promise<void>
 }
 
-// ─── Mapping Storage ──────────────────────────────────────────────────────────
-
-/** Maps BEP entity IDs to their real-world URLs (e.g. files in a CDE). */
-export type MappingStore = {
-  deliverables: { id: string; url: string }[]
-}
-
-/** Abstraction over where the mapping store is persisted. */
-export interface MappingStorage {
-  getMapping(projectId: string): Promise<MappingStore>
-  saveMapping(projectId: string, mapping: MappingStore): Promise<void>
-}
