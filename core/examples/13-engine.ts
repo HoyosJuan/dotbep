@@ -85,7 +85,7 @@ bep.engine.init({ runtime: new MyRuntime({ env: {} }) })
 console.log('\n=== create instance ===')
 const instance = await bep.engine.createInstance(
   workflowId,
-  { assetTypeId, id: 'model-001', label: 'Structural Model v3' },
+  { assetTypeId, id: 'model-001', label: 'Structural Model v3', source: 'bep:deliverables' },
   'manager@demo.com',
 )
 console.log('status:', instance!.status)

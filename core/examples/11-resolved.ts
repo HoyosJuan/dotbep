@@ -92,7 +92,6 @@ const resolvedBimUses = bep.bimUses.listResolved()
 for (const bu of resolvedBimUses) {
   console.log(`  ${bu.name}:`)
   console.log(`    objectives: [${bu.objectives.map(o => o.description.slice(0, 35)).join(' | ')}]`)
-  console.log(`    software:   [${bu.software?.softwares.map(s => s.name).join(', ') ?? 'none'}]`)
   console.log(`    workflows:  [${bu.workflows.map(w => w.name).join(', ')}]`)
 }
 
