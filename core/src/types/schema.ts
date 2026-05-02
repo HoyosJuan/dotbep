@@ -635,6 +635,7 @@ export const DeliverableBaseSchema = z.object({
   milestoneId:   z.string(),
   dueDate: z.iso.date().optional(),
   predecessorId: z.string().optional(),
+  url: z.url().optional(),
   resolverId: z.string().min(1).optional(),
 }).describe('A formal output committed by a team at a milestone. Defines what must be delivered, in what format, by whom, and by when.')
 
