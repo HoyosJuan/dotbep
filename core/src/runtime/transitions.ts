@@ -177,7 +177,6 @@ export function createInstance(
       trackedAsset,
       currentNodeId: firstNodeId,
       status: 'active',
-      context: {},
       history: [],
       createdAt: now,
       updatedAt: now,
@@ -193,7 +192,6 @@ export function createInstance(
  * Processes an incoming event against a workflow instance.
  *
  * - Finds the matching outgoing edge from the current node.
- * - Merges the event payload into the instance context.
  * - Auto-traverses decision nodes using the same event payload.
  * - Returns the updated instance and the effects to fire. Pure — does not mutate.
  */
@@ -218,7 +216,6 @@ export function processEvent(
 
   // Working state — assembled immutably into the final instance at the end.
   let currentNodeId = instance.currentNodeId
-  let context = { ...instance.context }
   const newHistory: TransitionEvent[] = []
   const effectsToFire: { effectId: string; fromEdgeId: string }[] = []
   const transitionsApplied: TransitionStep[] = []
@@ -239,8 +236,7 @@ export function processEvent(
     if (payloadErrors.length > 0) return { ok: false, error: 'INVALID_PAYLOAD', payloadErrors }
   }
 
-  context = { ...context, ...event.payload }
-  newHistory.push(buildTransitionEvent(edgeId, currentNodeId, edge.to, event, context))
+  newHistory.push(buildTransitionEvent(edgeId, currentNodeId, edge.to, event))
   effectsToFire.push(...(edge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: edgeId })))
   transitionsApplied.push({ edgeId, fromNodeId: currentNodeId, toNodeId: edge.to })
   currentNodeId = edge.to
@@ -258,7 +254,7 @@ export function processEvent(
     const outgoing = Object.entries(edges).filter(([, e]) => {
       if (e.from !== currentNodeId) return false
       if (!('guard' in e)) return false
-      return evaluateGuard(e.guard, context)
+      return evaluateGuard(e.guard, event.payload ?? {})
     })
 
     // No branch matches — leave instance on the decision node (diagram error).
@@ -267,7 +263,7 @@ export function processEvent(
     // Take first matching branch — guards are expected to be mutually exclusive.
     const [decEdgeId, decEdge] = outgoing[0]!
 
-    newHistory.push(buildTransitionEvent(decEdgeId, currentNodeId, decEdge.to, event, context, true))
+    newHistory.push(buildTransitionEvent(decEdgeId, currentNodeId, decEdge.to, event, true))
     effectsToFire.push(...(decEdge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: decEdgeId })))
     transitionsApplied.push({ edgeId: decEdgeId, fromNodeId: currentNodeId, toNodeId: decEdge.to })
     currentNodeId = decEdge.to
@@ -282,7 +278,6 @@ export function processEvent(
     ...instance,
     currentNodeId,
     status: newStatus,
-    context,
     history: [...instance.history, ...newHistory],
     updatedAt: new Date().toISOString(),
   }
@@ -446,18 +441,16 @@ function buildTransitionEvent(
   fromNodeId: string,
   toNodeId: string,
   trigger: IncomingEvent,
-  contextSnapshot: Record<string, unknown>,
   auto?: boolean,
 ): TransitionEvent {
   return {
-    id:              globalThis.crypto.randomUUID(),
+    id:        globalThis.crypto.randomUUID(),
     edgeId,
     fromNodeId,
     toNodeId,
     trigger,
-    actor:           trigger.actor,
-    timestamp:       new Date().toISOString(),
-    contextSnapshot: { ...contextSnapshot },
+    actor:     trigger.actor,
+    timestamp: new Date().toISOString(),
     ...(auto ? { auto: true } : {}),
   }
 }

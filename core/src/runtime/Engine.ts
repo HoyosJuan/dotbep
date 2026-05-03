@@ -273,6 +273,14 @@ export class Engine {
     await Promise.allSettled(listeners.map(fn => fn(...args)))
   }
 
+  private _resolveFromHistory(key: string, history: WorkflowInstance['history']): unknown {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const payload = history[i]!.trigger.payload ?? {}
+      if (key in payload) return payload[key]
+    }
+    return undefined
+  }
+
   private async _executeAutomationNode(
     instance: WorkflowInstance,
     automationId: string,
@@ -280,7 +288,7 @@ export class Engine {
     const bep           = this.getBep()
     const automationDef = bep.automations.find(s => s.id === automationId)
     const fields        = automationDef?.payload ?? []
-    const payload       = Object.fromEntries(fields.map(f => [f.key, instance.context[f.key]]))
+    const payload       = Object.fromEntries(fields.map(f => [f.key, this._resolveFromHistory(f.key, instance.history)]))
 
     const handler = this.runtime.automations[automationId]
     if (!handler) throw new Error(`No handler declared for automation "${automationId}"`)
@@ -296,7 +304,7 @@ export class Engine {
     const fields    = effectDef?.payload ?? []
 
     const missing = fields
-      .filter(f => f.required && instance.context[f.key] === undefined)
+      .filter(f => f.required && this._resolveFromHistory(f.key, instance.history) === undefined)
       .map(f => f.key)
 
     if (missing.length > 0) {
@@ -308,7 +316,7 @@ export class Engine {
       return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped' }
     }
 
-    const payload = Object.fromEntries(fields.map(f => [f.key, instance.context[f.key]]))
+    const payload = Object.fromEntries(fields.map(f => [f.key, this._resolveFromHistory(f.key, instance.history)]))
 
     try {
       await handler(instance, payload)

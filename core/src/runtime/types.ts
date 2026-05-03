@@ -35,8 +35,6 @@ export interface TransitionEvent {
   actor: string
   /** ISO 8601 datetime */
   timestamp: string
-  /** Snapshot of the instance context at the moment of transition. */
-  contextSnapshot: Record<string, unknown>
   /**
    * True when this transition was performed automatically by the engine
    * (e.g. decision node auto-traversal). The actor and trigger fields still
@@ -74,8 +72,6 @@ export interface WorkflowInstance {
   /** Key of the current FlowNode. Not a decision node — engine auto-traverses those. */
   currentNodeId: string
   status: InstanceStatus
-  /** Accumulated payload from all transitions. Each emit merges into this. */
-  context: Record<string, unknown>
   /** Ordered log of all transitions, oldest first. */
   history: TransitionEvent[]
 
