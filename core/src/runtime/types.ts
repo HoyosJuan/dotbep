@@ -210,6 +210,13 @@ export type ResolverHandler = (
 ) => Promise<unknown>
 
 /**
+ * Handler registered for a specific Adapter.id.
+ * Receives the raw output of a resolver and returns a transformed payload
+ * compatible with the target lens input schema.
+ */
+export type AdapterHandler = (data: unknown) => unknown
+
+/**
  * Handler for an automation node. Receives the instance and the payload filtered
  * from instance.context according to FlowAutomation.payload. Must return an object
  * with an eventId matching the FlowEvent declared on the outgoing edge, plus any

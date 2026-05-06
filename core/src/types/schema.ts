@@ -668,6 +668,14 @@ export const ResolverSchema = z.object({
 
 export type Resolver = z.infer<typeof ResolverSchema>
 
+export const AdapterSchema = z.object({
+  id:          z.string().min(1).describe('Human-readable slug, e.g. "discipline-progress"'),
+  name:        z.string().min(1),
+  description: z.string().optional(),
+}).describe('A transformation function declared in the BEP bundle that converts resolver output into a compatible format.')
+
+export type Adapter = z.infer<typeof AdapterSchema>
+
 export const RemoteDataSchema = z.object({
   id:          z.uuid(),
   name:        z.string().min(1),
@@ -701,7 +709,8 @@ export const BEPSchema = z.object({
   automations:     z.array(FlowAutomationSchema),
   env:             z.array(EnvVarSchema),
   resolvers:       z.array(ResolverSchema),
-  remoteData: z.array(RemoteDataSchema),
+  adapters:        z.array(AdapterSchema),
+  remoteData:      z.array(RemoteDataSchema),
   workflows:       z.array(WorkflowSchema),
   guides:          z.array(GuideSchema),
   annexes:         z.array(AnnexSchema),
