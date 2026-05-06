@@ -807,6 +807,32 @@
           "description": "A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource."
         }
       },
+      "adapters": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable slug, e.g. \"discipline-progress\""
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false,
+          "description": "A transformation function declared in the BEP bundle that converts resolver output into a compatible format."
+        }
+      },
       "remoteData": {
         "type": "array",
         "items": {
@@ -1687,6 +1713,7 @@
       "automations",
       "env",
       "resolvers",
+      "adapters",
       "remoteData",
       "workflows",
       "guides",
