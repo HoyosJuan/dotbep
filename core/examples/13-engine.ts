@@ -5,9 +5,9 @@
 // bep.generateTypes() produces a TypeScript contract from the BEP's effects
 // and automations. Writing it to bep.d.ts gives full type safety in the Runtime.
 //
-// Workflow (4 nodes):
+// Workflow (3 nodes):
 //
-//   start ──► review ──[submit / effect: notify-reviewer]──► auto-approve ──[approved]──► end
+//   start ──► review ──[submit / effect: notify-reviewer]──► end
 
 import { writeFileSync } from 'node:fs'
 import * as BEP from '../dist/index.js'
@@ -32,21 +32,28 @@ bep.effects.add([
 bep.automations.add([
   { id: 'auto-approve', name: 'Auto approve', output: [] },
 ])
+bep.resolvers.add([
+  { id: 'fetch-json', name: 'Fetch JSON', envKeys: [] },
+])
+bep.adapters.add([
+  { id: 'pick-label-value', name: 'Pick label + value' },
+])
+bep.remoteData.add([
+  { name: 'Model stats', url: 'https://example.com/stats.json', resolverId: 'fetch-json' },
+])
 
 const [{ id: workflowId }] = bep.workflows.add([{
   name: 'Model Review',
   diagram: {
     direction: 'LR',
     nodes: {
-      start:       { type: 'start' },
-      review:      { type: 'process', actionId: actionReviewId, responsibleRoleIds: [roleManagerId] },
-      autoApprove: { type: 'automation', automationId: 'auto-approve' },
-      end:         { type: 'end' },
+      start:  { type: 'start' },
+      review: { type: 'process', actionId: actionReviewId, responsibleRoleIds: [roleManagerId] },
+      end:    { type: 'end' },
     },
     edges: {
-      e1: { from: 'start',       to: 'review' },
-      e2: { from: 'review',      to: 'autoApprove', triggerEventId: 'submit', effectIds: ['notify-reviewer'] },
-      e3: { from: 'autoApprove', to: 'end',         triggerEventId: 'approved' },
+      e1: { from: 'start',  to: 'review' },
+      e2: { from: 'review', to: 'end', triggerEventId: 'submit', effectIds: ['notify-reviewer'] },
     },
   },
 }]).succeeded
@@ -74,6 +81,13 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
     this.automation('auto-approve', async (_instance, _payload) => {
       console.log('  [automation] auto-approve running')
       return { eventId: 'approved' }
+    })
+    this.resolver('fetch-json', async (url, _env) => {
+      const res = await fetch(url)
+      return res.json()
+    })
+    this.adapter('pick-label-value', (data) => {
+      return (data as { name: string; count: number }[]).map(d => ({ label: d.name, value: d.count }))
     })
   }
 }
