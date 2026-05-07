@@ -251,7 +251,7 @@ export type FlowEvent = z.infer<typeof FlowEventSchema>
 export const FlowEffectSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "notify".'),
   name:        z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).describe('Describe exactly what this effect must do so the runtime developer knows what to implement: what action it performs, what external system it calls, and what data it needs from the instance context.'),
   payload:     z.array(FlowPayloadFieldSchema).optional(),
 }).describe('A fire-and-forget side effect triggered on a workflow edge. Executed by the runtime when the edge is traversed, using fields from the instance context as payload.')
 
@@ -260,7 +260,7 @@ export type FlowEffect = z.infer<typeof FlowEffectSchema>
 export const FlowAutomationSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "verify-tolerances".'),
   name:        z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).describe('Describe what this handler checks and what decision it produces: what condition or data it evaluates, where that data comes from, and what the possible outcomes are so the developer can map them to outgoing decision edges.'),
   payload:     z.array(FlowPayloadFieldSchema).optional()
     .describe('Fields consumed from instance context and passed to the handler.'),
   output:      z.array(FlowPayloadFieldSchema)
@@ -652,7 +652,7 @@ export type Deliverable = z.infer<typeof DeliverableSchema>
 export const EnvVarSchema = z.object({
   key:         z.string().min(1).describe('Variable name referenced in effect handlers as config.KEY.'),
   description: z.string().optional(),
-  secret:      z.boolean().optional().describe('If true, the value is masked in the UI after being saved.'),
+  secret:      z.boolean().optional(),
 }).describe('A runtime configuration entry for effect and automation handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them.')
 
 export type EnvVar = z.infer<typeof EnvVarSchema>
@@ -662,7 +662,7 @@ export type EnvVar = z.infer<typeof EnvVarSchema>
 export const ResolverSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "google-sheet"'),
   name:        z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).describe('Describe what external data this fetches, from where, and what format it returns: which service or API it calls, what credentials it needs, and the shape of the raw payload it returns so the runtime developer and adapter author know what to expect.'),
   envKeys:     z.array(z.string().min(1)).describe('ref EnvVar.key[] — env vars required by this resolver handler.'),
 }).describe('A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource.')
 
@@ -671,7 +671,7 @@ export type Resolver = z.infer<typeof ResolverSchema>
 export const AdapterSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "discipline-progress"'),
   name:        z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).describe('Describe the input format (resolver output shape), the transformation applied, and the output format (lens-compatible shape) so the runtime developer can implement the correct mapping.'),
 }).describe('A transformation function declared in the BEP bundle that converts resolver output into a compatible format.')
 
 export type Adapter = z.infer<typeof AdapterSchema>
@@ -679,7 +679,7 @@ export type Adapter = z.infer<typeof AdapterSchema>
 export const RemoteDataSchema = z.object({
   id:          z.uuid(),
   name:        z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).describe('Describe what this data source represents in the project context: what information it holds, how it is used in the BEP, and who or what system produces it.'),
   url:         z.url(),
   resolverId:  z.string().min(1).optional().describe('ref Resolver.id'),
 }).describe('A reference to an external data source that is fetched at runtime. The BEP does not store the data — it only declares where it lives and how to access it using a resolver.')
