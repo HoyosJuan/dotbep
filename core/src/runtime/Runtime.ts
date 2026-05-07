@@ -87,6 +87,20 @@ export class Runtime<T extends {
     this.adapters[key] = handler
     return this
   }
+
+  /** @internal Called by Engine.getRemoteData — keeps env encapsulated inside the Runtime. */
+  _runResolver(id: string, url: string): Promise<unknown> {
+    const handler = this.resolvers[id]
+    if (!handler) throw new Error(`No handler declared for resolver "${id}"`)
+    return handler(url, this.env)
+  }
+
+  /** @internal Called by Engine.useAdapter — keeps handler lookup inside the Runtime. */
+  _runAdapter(id: string, data: unknown): unknown {
+    const handler = this.adapters[id]
+    if (!handler) throw new Error(`No handler declared for adapter "${id}"`)
+    return handler(data)
+  }
 }
 
 // Untyped aliases used internally by Engine (which works with the base contract)

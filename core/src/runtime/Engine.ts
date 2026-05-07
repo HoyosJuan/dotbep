@@ -251,6 +251,28 @@ export class Engine {
     await this.storage.deleteInstance(instanceId)
   }
 
+  /**
+   * Runs the resolver declared for a remote data source and returns the raw payload.
+   * Throws if the remoteDataId does not exist in the BEP or has no resolver assigned.
+   */
+  async getRemoteData(remoteDataId: string): Promise<unknown> {
+    this._assertInit()
+    const bep    = this.getBep()
+    const remote = bep.remoteData.find(r => r.id === remoteDataId)
+    if (!remote)            throw new Error(`Remote data "${remoteDataId}" not found in BEP`)
+    if (!remote.resolverId) throw new Error(`Remote data "${remoteDataId}" has no resolver assigned`)
+    return this.runtime._runResolver(remote.resolverId, remote.url)
+  }
+
+  /**
+   * Runs an adapter to transform data into a lens-compatible format.
+   * Throws if the adapterId has no registered handler.
+   */
+  useAdapter(adapterId: string, data: unknown): unknown {
+    this._assertInit()
+    return this.runtime._runAdapter(adapterId, data)
+  }
+
   // ─── Internal ────────────────────────────────────────────────────────────────
 
   private _assertInit(): void {
