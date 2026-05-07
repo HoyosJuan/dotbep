@@ -3,6 +3,8 @@ import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandle
 export interface BepTypes {
   effects:     Record<string, Record<string, unknown>>
   automations: Record<string, Record<string, unknown>>
+  resolvers:   Record<string, never>
+  adapters:    Record<string, never>
 }
 
 type TypedEffectHandler<TPayload extends Record<string, unknown>> = (
@@ -46,6 +48,8 @@ export interface RuntimeOptions {
 export class Runtime<T extends {
   effects:     Record<string, any>
   automations: Record<string, any>
+  resolvers:   Record<string, any>
+  adapters:    Record<string, any>
 } = BepTypes> {
   protected readonly env: Record<string, string>
 
@@ -74,12 +78,12 @@ export class Runtime<T extends {
     return this
   }
 
-  protected resolver(key: string, handler: ResolverHandler): this {
+  protected resolver<K extends keyof T['resolvers'] & string>(key: K, handler: ResolverHandler): this {
     this.resolvers[key] = handler
     return this
   }
 
-  protected adapter(key: string, handler: AdapterHandler): this {
+  protected adapter<K extends keyof T['adapters'] & string>(key: K, handler: AdapterHandler): this {
     this.adapters[key] = handler
     return this
   }
