@@ -1,9 +1,10 @@
 // run: node --experimental-strip-types examples/13-engine.ts  (from core/)
 //
-// Covers: Engine, Runtime, workflow execution, type generation.
+// Covers: Engine, Runtime, workflow execution, type generation,
+//         getRemoteData, useAdapter.
 //
-// bep.generateTypes() produces a TypeScript contract from the BEP's effects
-// and automations. Writing it to bep.d.ts gives full type safety in the Runtime.
+// bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's runtime handlers — with JSDoc from each description field.
+// Writing it to bep.d.ts gives full type safety in the Runtime development.
 //
 // Workflow (3 nodes):
 //
@@ -27,19 +28,39 @@ bep.events.add([
   { id: 'approved', name: 'Approved' },
 ])
 bep.effects.add([
-  { id: 'notify-reviewer', name: 'Notify reviewer', payload: [{ key: 'comment', type: 'string', required: false }] },
+  {
+    id: 'notify-reviewer', name: 'Notify reviewer',
+    description: 'Sends a notification to the assigned reviewer when a model is submitted. Uses the comment from the submit event payload.',
+    payload: [{ key: 'comment', type: 'string', required: false }],
+  },
 ])
 bep.automations.add([
-  { id: 'auto-approve', name: 'Auto approve', output: [] },
+  {
+    id: 'auto-approve', name: 'Auto approve',
+    description: 'Automatically approves the model if no blocking issues are found in the previous review cycle.',
+    payload: [{ key: 'threshold', type: 'number', required: true }],
+    output: [{ key: 'result', type: 'string', required: true }],
+  },
 ])
 bep.resolvers.add([
-  { id: 'fetch-json', name: 'Fetch JSON', envKeys: [] },
+  {
+    id: 'fetch-json', name: 'Fetch JSON',
+    description: 'Fetches a JSON array from the remote data URL. Authenticates with an API key via Authorization header. Returns the raw parsed array.',
+    envKeys: ['API_KEY'],
+  },
 ])
 bep.adapters.add([
-  { id: 'pick-label-value', name: 'Pick label + value' },
+  {
+    id: 'pick-label-value', name: 'Pick label + value',
+    description: 'Maps an array of { name, count } objects to { label, value } pairs compatible with dotbep:pie-chart.',
+  },
 ])
 bep.remoteData.add([
-  { name: 'Model stats', url: 'https://example.com/stats.json', resolverId: 'fetch-json' },
+  {
+    name: 'Model stats', url: 'https://example.com/stats.json',
+    description: 'Aggregated model statistics exported nightly from the project management tool.',
+    resolverId: 'fetch-json',
+  },
 ])
 
 const [{ id: workflowId }] = bep.workflows.add([{
@@ -60,10 +81,10 @@ const [{ id: workflowId }] = bep.workflows.add([{
 
 // ─── 2. Generate types ────────────────────────────────────────────────────────
 //
-// bep.generateTypes() produces a TypeScript contract from the BEP's effects and
+// bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's effects and
 // automations. Commit bep.d.ts alongside your runtime so TypeScript can validate it.
 
-writeFileSync('examples/bep.d.ts', bep.generateTypes())
+writeFileSync('examples/bep.d.ts', bep.generateRuntimeTypes())
 console.log('Generated examples/bep.d.ts')
 
 // ─── 3. Declare the BEP Runtime ───────────────────────────────────────────────
@@ -78,12 +99,12 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
       console.log('  [effect] submitted by:', instance.history.at(-1)?.actor)
       console.log('  [effect] comment:', payload.comment)  // string | undefined ← inferred
     })
-    this.automation('auto-approve', async (_instance, _payload) => {
-      console.log('  [automation] auto-approve running')
-      return { eventId: 'approved' }
+    this.automation('auto-approve', async (_instance, payload) => {
+      console.log('  [automation] auto-approve running, threshold:', payload.threshold)
+      return { eventId: 'approved', result: 'passed' }
     })
-    this.resolver('fetch-json', async (url, _env) => {
-      const res = await fetch(url)
+    this.resolver('fetch-json', async (url, env) => {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${env.API_KEY}` } })
       return res.json()
     })
     this.adapter('pick-label-value', (data) => {
@@ -116,3 +137,16 @@ console.log('transitions:', result.transitionsApplied?.map(t => `${t.fromNodeId}
 console.log('effects:', result.effects?.map(e => `${e.effectId}: ${e.status}`))
 console.log('final node:', result.instance?.currentNodeId)
 console.log('final status:', result.instance?.status)
+
+console.log('\n=== getRemoteData + useAdapter ===')
+// Uses a mock resolver so the demo works without a real endpoint.
+const remoteDataId = bep.data.remoteData[0]!.id
+try {
+  const raw     = await bep.engine.getRemoteData(remoteDataId)
+  const adapted = bep.engine.useAdapter('pick-label-value', raw)
+  console.log('raw data:', raw)
+  console.log('adapted:', adapted)
+} catch (err) {
+  // example.com/stats.json returns HTML — expected in this demo.
+  console.log('(resolver error, expected with placeholder URL):', (err as Error).message)
+}
