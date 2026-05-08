@@ -1,6 +1,6 @@
 {
   "name": "@dotbep/core",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,6 +10,9 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
