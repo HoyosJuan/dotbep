@@ -650,10 +650,10 @@ export type Deliverable = z.infer<typeof DeliverableSchema>
 // ─── Environment variables ────────────────────────────────────────────────────
 
 export const EnvVarSchema = z.object({
-  key:         z.string().min(1).describe('Variable name referenced in effect handlers as config.KEY.'),
-  description: z.string().optional(),
-  secret:      z.boolean().optional(),
-}).describe('A runtime configuration entry for effect and automation handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them.')
+  key:         z.string().min(1),
+  description: z.string().min(1).describe('Describe what this variable holds and which service it belongs to.'),
+  sensitive:   z.boolean().optional(),
+}).describe('A runtime configuration entry for handlers. Used to store credentials, endpoints, or other runtime settings without hardcoding them.')
 
 export type EnvVar = z.infer<typeof EnvVarSchema>
 
