@@ -1,26 +1,16 @@
 import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, AdapterHandler } from './types.js'
 
 export interface BepTypes {
-  effects:     Record<string, Record<string, unknown>>
-  automations: Record<string, Record<string, unknown>>
-  resolvers:   Record<string, never>
-  adapters:    Record<string, never>
+  effects:     Record<string, (...args: any[]) => void>
+  automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
+  resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
+  adapters:    Record<string, (data: unknown) => unknown>
 }
-
-type TypedEffectHandler<TPayload extends Record<string, unknown>> = (
-  instance: WorkflowInstance,
-  payload:  TPayload,
-) => Promise<void>
-
-type TypedAutomationHandler<TPayload extends Record<string, unknown>> = (
-  instance: WorkflowInstance,
-  payload:  TPayload,
-) => Promise<{ eventId: string } & Record<string, unknown>>
 
 /**
  * Base class for the runtime that accompanies a BEP.
- * Extend this class and register handlers in the constructor via
- * this.effect() and this.automation() for full payload type safety.
+ * Extend this class and register handlers in the constructor.
+ * Pass the generated BepTypes as the generic parameter for full type safety.
  *
  * @example
  * import type { BepTypes } from './bep.js'
@@ -30,12 +20,15 @@ type TypedAutomationHandler<TPayload extends Record<string, unknown>> = (
  *   constructor(options: BEP.RuntimeOptions) {
  *     super(options)
  *     this.effect('send-email', async (instance, payload) => {
- *       const key = this.env.SENDGRID_KEY  // ← env disponible en todos los handlers
- *       await sendEmail(key, payload.to)
+ *       await sendEmail(this.env.SENDGRID_KEY, payload.to)
  *     })
- *     this.automation('check-approval', async (instance, payload) => {
+ *     this.automation('check-approval', async (instance) => {
  *       return { eventId: 'approved' }
  *     })
+ *     this.resolver('fetch-data', async (url) => {
+ *       return fetch(url).then(r => r.json())
+ *     })
+ *     this.adapter('to-chart', (data) => data)
  *   }
  * }
  *
@@ -64,27 +57,33 @@ export class Runtime<T extends {
 
   protected effect<K extends keyof T['effects'] & string>(
     key: K,
-    handler: TypedEffectHandler<T['effects'][K]>,
+    handler: (instance: WorkflowInstance, ...args: Parameters<T['effects'][K]>) => Promise<void>,
   ): this {
-    this.effects[key] = handler as EffectHandler
+    this.effects[key] = handler as unknown as EffectHandler
     return this
   }
 
   protected automation<K extends keyof T['automations'] & string>(
     key: K,
-    handler: TypedAutomationHandler<T['automations'][K]>,
+    handler: (instance: WorkflowInstance, ...args: Parameters<T['automations'][K]>) => Promise<ReturnType<T['automations'][K]>>,
   ): this {
-    this.automations[key] = handler as AutomationHandler
+    this.automations[key] = handler as unknown as AutomationHandler
     return this
   }
 
-  protected resolver<K extends keyof T['resolvers'] & string>(key: K, handler: ResolverHandler): this {
-    this.resolvers[key] = handler
+  protected resolver<K extends keyof T['resolvers'] & string>(
+    key: K,
+    handler: (...args: Parameters<T['resolvers'][K]>) => Promise<ReturnType<T['resolvers'][K]>>,
+  ): this {
+    this.resolvers[key] = handler as unknown as ResolverHandler
     return this
   }
 
-  protected adapter<K extends keyof T['adapters'] & string>(key: K, handler: AdapterHandler): this {
-    this.adapters[key] = handler
+  protected adapter<K extends keyof T['adapters'] & string>(
+    key: K,
+    handler: (...args: Parameters<T['adapters'][K]>) => ReturnType<T['adapters'][K]>,
+  ): this {
+    this.adapters[key] = handler as unknown as AdapterHandler
     return this
   }
 
