@@ -251,7 +251,7 @@ export type FlowEvent = z.infer<typeof FlowEventSchema>
 export const FlowEffectSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "notify".'),
   name:        z.string().min(1),
-  description: z.string().min(1).describe('Describe exactly what this effect must do so the runtime developer knows what to implement: what action it performs, what external system it calls, and what data it needs from the instance context.'),
+  description: z.string().min(1).describe('Describe exactly what this effect must do so the runtime developer knows what to implement: what action it performs and what external system or service it calls.'),
   payload:     z.array(FlowPayloadFieldSchema).optional(),
 }).describe('A fire-and-forget side effect triggered on a workflow edge. Executed by the runtime when the edge is traversed, using fields from the instance context as payload.')
 
@@ -260,7 +260,7 @@ export type FlowEffect = z.infer<typeof FlowEffectSchema>
 export const FlowAutomationSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "verify-tolerances".'),
   name:        z.string().min(1),
-  description: z.string().min(1).describe('Describe what this handler checks and what decision it produces: what condition or data it evaluates, where that data comes from, and what the possible outcomes are so the developer can map them to outgoing decision edges.'),
+  description: z.string().min(1).describe('Describe what this handler checks and what decision it produces: what condition or business rule it evaluates and where that data comes from.'),
   payload:     z.array(FlowPayloadFieldSchema).optional()
     .describe('Fields consumed from instance context and passed to the handler.'),
   output:      z.array(FlowPayloadFieldSchema)
