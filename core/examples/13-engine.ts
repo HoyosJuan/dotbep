@@ -42,6 +42,12 @@ bep.automations.add([
     output: [{ key: 'result', type: 'string', required: true }],
   },
 ])
+bep.env.add([
+  {
+    key: 'API_KEY',
+    description: 'Bearer token for the project management API. Obtain it from the API settings page of the platform.',
+  },
+])
 bep.resolvers.add([
   {
     id: 'fetch-json', name: 'Fetch JSON',
@@ -115,7 +121,7 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
 
 // ─── 4. Init the engine and run ───────────────────────────────────────────────
 
-bep.engine.init({ runtime: new MyRuntime({ env: {} }) })
+bep.engine.init({ runtime: new MyRuntime({ env: {API_KEY: "value"} }) })
 
 console.log('\n=== create instance ===')
 const instance = await bep.engine.createInstance(
