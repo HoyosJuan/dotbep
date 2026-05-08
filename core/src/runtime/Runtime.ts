@@ -5,6 +5,7 @@ export interface BepTypes {
   automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
   resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
   adapters:    Record<string, (data: unknown) => unknown>
+  env:         Record<string, string>
 }
 
 /**
@@ -43,8 +44,9 @@ export class Runtime<T extends {
   automations: Record<string, any>
   resolvers:   Record<string, any>
   adapters:    Record<string, any>
+  env:         Record<string, any>
 } = BepTypes> {
-  protected readonly env: Record<string, string>
+  protected readonly env: T['env']
 
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
