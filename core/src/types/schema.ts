@@ -662,19 +662,12 @@ export type EnvVar = z.infer<typeof EnvVarSchema>
 export const ResolverSchema = z.object({
   id:          z.string().min(1).describe('Human-readable slug, e.g. "google-sheet"'),
   name:        z.string().min(1),
-  description: z.string().min(1).describe('Describe what external data this fetches, from where, and what format it returns: which service or API it calls, what credentials it needs, and the shape of the raw payload it returns so the runtime developer and adapter author know what to expect.'),
+  description: z.string().min(1).describe('Describe what external data this fetches, from where, and what format it returns: which service or API it calls, what credentials it needs, and the shape of the raw payload it returns.'),
   envKeys:     z.array(z.string().min(1)).describe('ref EnvVar.key[] — env vars required by this resolver handler.'),
 }).describe('A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource.')
 
 export type Resolver = z.infer<typeof ResolverSchema>
 
-export const AdapterSchema = z.object({
-  id:          z.string().min(1).describe('Human-readable slug, e.g. "discipline-progress"'),
-  name:        z.string().min(1),
-  description: z.string().min(1).describe('Describe the input format (resolver output shape), the transformation applied, and the output format (lens-compatible shape) so the runtime developer can implement the correct mapping.'),
-}).describe('A transformation function declared in the BEP bundle that converts resolver output into a compatible format.')
-
-export type Adapter = z.infer<typeof AdapterSchema>
 
 export const RemoteDataSchema = z.object({
   id:          z.uuid(),
@@ -709,7 +702,6 @@ export const BEPSchema = z.object({
   automations:     z.array(FlowAutomationSchema),
   env:             z.array(EnvVarSchema),
   resolvers:       z.array(ResolverSchema),
-  adapters:        z.array(AdapterSchema),
   remoteData:      z.array(RemoteDataSchema),
   workflows:       z.array(WorkflowSchema),
   guides:          z.array(GuideSchema),

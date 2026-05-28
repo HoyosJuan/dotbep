@@ -1,7 +1,6 @@
 // run: node --experimental-strip-types examples/13-engine.ts  (from core/)
 //
-// Covers: Engine, Runtime, workflow execution, type generation,
-//         getRemoteData, useAdapter.
+// Covers: Engine, Runtime, workflow execution, type generation, getRemoteData.
 //
 // bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's runtime handlers — with JSDoc from each description field.
 // Writing it to bep.d.ts gives full type safety in the Runtime development.
@@ -53,12 +52,6 @@ bep.resolvers.add([
     id: 'fetch-json', name: 'Fetch JSON',
     description: 'Fetches a JSON array from the remote data URL. Authenticates with an API key via Authorization header. Returns the raw parsed array.',
     envKeys: ['API_KEY'],
-  },
-])
-bep.adapters.add([
-  {
-    id: 'pick-label-value', name: 'Pick label + value',
-    description: 'Maps an array of { name, count } objects to { label, value } pairs compatible with dotbep:pie-chart.',
   },
 ])
 bep.remoteData.add([
@@ -113,9 +106,6 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${env.API_KEY}` } })
       return res.json()
     })
-    this.adapter('pick-label-value', (data) => {
-      return (data as { name: string; count: number }[]).map(d => ({ label: d.name, value: d.count }))
-    })
   }
 }
 
@@ -144,14 +134,11 @@ console.log('effects:', result.effects?.map(e => `${e.effectId}: ${e.status}`))
 console.log('final node:', result.instance?.currentNodeId)
 console.log('final status:', result.instance?.status)
 
-console.log('\n=== getRemoteData + useAdapter ===')
-// Uses a mock resolver so the demo works without a real endpoint.
+console.log('\n=== getRemoteData ===')
 const remoteDataId = bep.data.remoteData[0]!.id
 try {
-  const raw     = await bep.engine.getRemoteData(remoteDataId)
-  const adapted = bep.engine.useAdapter('pick-label-value', raw)
+  const raw = await bep.engine.getRemoteData(remoteDataId)
   console.log('raw data:', raw)
-  console.log('adapted:', adapted)
 } catch (err) {
   // example.com/stats.json returns HTML — expected in this demo.
   console.log('(resolver error, expected with placeholder URL):', (err as Error).message)

@@ -1,10 +1,9 @@
-import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, AdapterHandler } from './types.js'
+import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler } from './types.js'
 
 export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
   automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
   resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
-  adapters:    Record<string, (data: unknown) => unknown>
   env:         Record<string, string>
 }
 
@@ -43,7 +42,6 @@ export class Runtime<T extends {
   effects:     Record<string, any>
   automations: Record<string, any>
   resolvers:   Record<string, any>
-  adapters:    Record<string, any>
   env:         Record<string, any>
 } = BepTypes> {
   protected readonly env: T['env']
@@ -51,7 +49,6 @@ export class Runtime<T extends {
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
   readonly resolvers:   Record<string, ResolverHandler>   = {}
-  readonly adapters:    Record<string, AdapterHandler>    = {}
 
   constructor({ env = {} }: RuntimeOptions = {}) {
     this.env = env
@@ -81,14 +78,6 @@ export class Runtime<T extends {
     return this
   }
 
-  protected adapter<K extends keyof T['adapters'] & string>(
-    key: K,
-    handler: (...args: Parameters<T['adapters'][K]>) => ReturnType<T['adapters'][K]>,
-  ): this {
-    this.adapters[key] = handler as unknown as AdapterHandler
-    return this
-  }
-
   /** @internal Called by Engine.getRemoteData — keeps env encapsulated inside the Runtime. */
   _runResolver(id: string, url: string): Promise<unknown> {
     const handler = this.resolvers[id]
@@ -96,13 +85,7 @@ export class Runtime<T extends {
     return handler(url, this.env)
   }
 
-  /** @internal Called by Engine.useAdapter — keeps handler lookup inside the Runtime. */
-  _runAdapter(id: string, data: unknown): unknown {
-    const handler = this.adapters[id]
-    if (!handler) throw new Error(`No handler declared for adapter "${id}"`)
-    return handler(data)
-  }
 }
 
 // Untyped aliases used internally by Engine (which works with the base contract)
-export type { EffectHandler, AutomationHandler, ResolverHandler, AdapterHandler }
+export type { EffectHandler, AutomationHandler, ResolverHandler }

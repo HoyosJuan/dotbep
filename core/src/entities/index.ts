@@ -1,5 +1,4 @@
 export { Actions } from './actions.js'
-export { Adapters } from './adapters.js'
 export { Automations } from './automations.js'
 export { Env } from './env.js'
 export { Effects } from './effects.js'

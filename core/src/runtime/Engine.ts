@@ -264,15 +264,6 @@ export class Engine {
     return this.runtime._runResolver(remote.resolverId, remote.url)
   }
 
-  /**
-   * Runs an adapter to transform data into a lens-compatible format.
-   * Throws if the adapterId has no registered handler.
-   */
-  useAdapter(adapterId: string, data: unknown): unknown {
-    this._assertInit()
-    return this.runtime._runAdapter(adapterId, data)
-  }
-
   // ─── Internal ────────────────────────────────────────────────────────────────
 
   private _assertInit(): void {

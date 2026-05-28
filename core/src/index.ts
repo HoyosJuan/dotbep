@@ -5,7 +5,6 @@ import { normalizeBep } from './utils/normalize.js'
 import { validateTokenValue, validateAllTokens } from './utils/naming.js'
 import { Singleton } from './base/singleton.js'
 import { Actions } from './entities/actions.js'
-import { Adapters } from './entities/adapters.js'
 import { Annexes } from './entities/annexes.js'
 import { Effects } from './entities/effects.js'
 import { Automations } from './entities/automations.js'
@@ -47,7 +46,6 @@ export class Bep {
   // ─── Entities ─────────────────────────────────────────────────────────────
 
   readonly actions: Actions
-  readonly adapters: Adapters
   readonly annexes: Annexes
   readonly deliverables: Deliverables
   readonly effects: Effects
@@ -115,7 +113,6 @@ export class Bep {
       bep,
     )
     this.actions        = new Actions(bep)
-    this.adapters       = new Adapters(bep)
     this.annexes        = new Annexes(bep)
     this.env            = new Env(bep)
     this.events         = new Events(bep)
@@ -401,10 +398,6 @@ export class Bep {
       ? this._data.resolvers.map(r => `${jsdoc(r.description)}  '${r.id}': ${resolverSig(r)}`).join('\n')
       : '  [key: string]: (url: string) => unknown'
 
-    const adapterLines = this._data.adapters.length
-      ? this._data.adapters.map(a => `${jsdoc(a.description)}  '${a.id}': (data: unknown) => unknown`).join('\n')
-      : '  [key: string]: (data: unknown) => unknown'
-
     const envLines = this._data.env.length
       ? this._data.env.map(e => `${jsdoc(e.description)}  ${e.key}: string`).join('\n')
       : '  [key: string]: string'
@@ -430,12 +423,6 @@ export class Bep {
       resolverLines,
       '}',
       '',
-      '// ─── Adapters ─────────────────────────────────────────────────────────────────',
-      '',
-      'export interface BepAdapters {',
-      adapterLines,
-      '}',
-      '',
       '// ─── Env ──────────────────────────────────────────────────────────────────────',
       '',
       'export interface BepEnv {',
@@ -448,7 +435,6 @@ export class Bep {
       '  effects:     BepEffects',
       '  automations: BepAutomations',
       '  resolvers:   BepResolvers',
-      '  adapters:    BepAdapters',
       '  env:         BepEnv',
       '}',
       '',

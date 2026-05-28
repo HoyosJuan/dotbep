@@ -30,6 +30,5 @@ export function normalizeBep(bep: BEP): BEP {
   bep.automations    ??= []
   bep.resolvers      ??= []
   bep.remoteData     ??= []
-  bep.adapters       ??= []
   return bep
 }

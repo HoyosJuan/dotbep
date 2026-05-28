@@ -21,13 +21,6 @@ export interface BepResolvers {
   'fetch-json': (url: string, env: { API_KEY: string }) => unknown
 }
 
-// ─── Adapters ─────────────────────────────────────────────────────────────────
-
-export interface BepAdapters {
-  /** Maps an array of { name, count } objects to { label, value } pairs compatible with dotbep:pie-chart. */
-  'pick-label-value': (data: unknown) => unknown
-}
-
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
 export interface BepEnv {
@@ -41,6 +34,5 @@ export interface BepTypes {
   effects:     BepEffects
   automations: BepAutomations
   resolvers:   BepResolvers
-  adapters:    BepAdapters
   env:         BepEnv
 }
