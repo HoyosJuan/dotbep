@@ -49,8 +49,11 @@ export class Engine {
   private readonly getHistoricalBep?: (version: string) => Promise<BEP>
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private runtime!:   Runtime<any>
+  private _runtime!:  Runtime<any>
   private storage!:   InstanceStore
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get runtime(): Runtime<any> { return this._runtime }
   private skipRaci =  false
 
   private readonly transitionListeners:   TransitionListener[]   = []
@@ -73,7 +76,7 @@ export class Engine {
    * Returns `this` for chaining.
    */
   init(config: EngineInitConfig): this {
-    this.runtime  = config.runtime
+    this._runtime = config.runtime
     this.storage  = config.storage ?? new MemoryStorage()
     this.skipRaci = config.events?.skipRaci ?? false
     return this
@@ -261,7 +264,7 @@ export class Engine {
     const remote = bep.remoteData.find(r => r.id === remoteDataId)
     if (!remote)            throw new Error(`Remote data "${remoteDataId}" not found in BEP`)
     if (!remote.resolverId) throw new Error(`Remote data "${remoteDataId}" has no resolver assigned`)
-    return this.runtime._runResolver(remote.resolverId, remote.url)
+    return this._runtime._runResolver(remote.resolverId, remote.url)
   }
 
   // ─── Internal ────────────────────────────────────────────────────────────────
@@ -303,7 +306,7 @@ export class Engine {
     const fields        = automationDef?.payload ?? []
     const payload       = Object.fromEntries(fields.map(f => [f.key, this._resolveFromHistory(f.key, instance.history)]))
 
-    const handler = this.runtime.automations[automationId]
+    const handler = this._runtime.automations[automationId]
     if (!handler) throw new Error(`No handler declared for automation "${automationId}"`)
     return handler(instance, payload)
   }
@@ -324,7 +327,7 @@ export class Engine {
       return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped', missingFields: missing }
     }
 
-    const handler = this.runtime.effects[ef.effectId]
+    const handler = this._runtime.effects[ef.effectId]
     if (!handler) {
       return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped' }
     }

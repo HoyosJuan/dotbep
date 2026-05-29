@@ -44,7 +44,7 @@ export class Runtime<T extends {
   resolvers:   Record<string, any>
   env:         Record<string, any>
 } = BepTypes> {
-  protected readonly env: T['env']
+  env: T['env']
 
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
