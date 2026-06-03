@@ -129,9 +129,39 @@ export class Engine {
     for (const ef of startEffects) {
       await this._executeEffect(instance, ef)
     }
-    await this.storage.saveInstance(instance)
-    await this._fire(this.createdListeners, instance)
-    return instance
+
+    // If the first node after start is an automation, execute it immediately —
+    // same loop as emit() uses for automation nodes reached via transitions.
+    const workflow  = bep.workflows.find(w => w.id === workflowId)
+    const firstNode = workflow?.diagram.nodes[instance.currentNodeId]
+    let automationPending = firstNode?.type === 'automation' && firstNode.automationId
+      ? { automationId: firstNode.automationId }
+      : undefined
+
+    let current = instance
+    const MAX_SERVICE_DEPTH = 10
+    let serviceDepth = 0
+
+    while (automationPending && serviceDepth++ < MAX_SERVICE_DEPTH) {
+      const { automationId } = automationPending
+      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId)
+      const autoResult = processEvent(bep, current, {
+        eventId,
+        actor:      '_system',
+        softwareId: '_system',
+        payload:    automationPayload,
+      })
+      if (!autoResult.ok) break
+      current = autoResult.instance!
+      for (const ef of autoResult.effectsToFire ?? []) {
+        await this._executeEffect(current, ef)
+      }
+      automationPending = autoResult.automationNodePending
+    }
+
+    await this.storage.saveInstance(current)
+    await this._fire(this.createdListeners, current)
+    return current
   }
 
   /**
