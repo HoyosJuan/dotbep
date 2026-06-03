@@ -177,7 +177,7 @@ export type ProcessEventError =
 
 export interface PayloadFieldError {
   field: string
-  reason: 'missing' | 'wrong_type' | 'unknown_field'
+  reason: 'missing' | 'wrong_type' | 'unknown_field' | 'invalid_format'
 }
 
 export interface TransitionStep {

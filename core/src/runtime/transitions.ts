@@ -97,6 +97,14 @@ function validatePayload(
       const expected = JS_TYPE[field.type]
       if (expected && typeof val !== expected) {
         errors.push({ field: field.key, reason: 'wrong_type' })
+      } else if (field.type === 'string' && field.validation) {
+        try {
+          if (!new RegExp(field.validation.pattern, field.validation.flags).test(val as string)) {
+            errors.push({ field: field.key, reason: 'invalid_format' })
+          }
+        } catch {
+          // malformed regex — skip validation
+        }
       }
     }
   }

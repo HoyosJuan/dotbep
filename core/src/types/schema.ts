@@ -233,9 +233,13 @@ export type Action = z.infer<typeof ActionSchema>
 // ─── Events & Effects (global catalogs) ───────────────────────────────────────
 
 export const FlowPayloadFieldSchema = z.object({
-  key:      z.string().min(1),
-  type:     z.enum(['string', 'number', 'boolean', 'url']),
-  required: z.boolean(),
+  key:        z.string().min(1),
+  type:       z.enum(['string', 'number', 'boolean']),
+  required:   z.boolean(),
+  label:      z.string().min(1).optional(),
+  description: z.string().optional(),
+  validation: z.object({ pattern: z.string().min(1), flags: z.string().optional() }).optional(),
+  options:    z.array(z.string().min(1)).optional(),
 })
 
 export type FlowPayloadField = z.infer<typeof FlowPayloadFieldSchema>

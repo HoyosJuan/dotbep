@@ -360,7 +360,7 @@ export class Bep {
    * writeFileSync('bep.d.ts', bep.generateRuntimeTypes())
    */
   generateRuntimeTypes(): string {
-    const tsType = (t: string) => t === 'url' ? 'string' : t
+    const tsType = (t: string) => t
 
     const jsdoc = (description: string) => `  /** ${description} */\n`
 
