@@ -4,7 +4,7 @@
 
 // ─── Status ───────────────────────────────────────────────────────────────────
 
-export type InstanceStatus = 'active' | 'completed' | 'suspended' | 'error'
+export type InstanceStatus = 'active' | 'completed' | 'cancelled'
 
 // ─── Incoming event ───────────────────────────────────────────────────────────
 
