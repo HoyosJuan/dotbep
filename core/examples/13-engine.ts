@@ -114,7 +114,7 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
 bep.engine.init({ runtime: new MyRuntime({ env: {API_KEY: "value"} }) })
 
 console.log('\n=== create instance ===')
-const instance = await bep.engine.createInstance(
+const instance = await bep.engine.workflows.create(
   workflowId,
   { assetTypeId, id: 'model-001', label: 'Structural Model v3', source: 'bep:deliverables' },
   'manager@demo.com',
@@ -123,7 +123,7 @@ console.log('status:', instance!.status)
 console.log('current node:', instance!.currentNodeId)
 
 console.log('\n=== emit: submit ===')
-const result = await bep.engine.emit(instance!.id, {
+const result = await bep.engine.workflows.emit(instance!.id, {
   eventId: 'submit',
   actor:   'manager@demo.com',
   payload: { comment: 'Ready for review' },
