@@ -1,18 +1,20 @@
 import type { BEP } from '../types/schema.js'
-import { createInstance as _createInstance, processEvent, getNodeConfig as _getNodeConfig } from './transitions.js'
+import { createInstance as _createInstance, processEvent, getWorkflowStatus as _getWorkflowStatus } from './transitions.js'
 import { MemoryStorage } from './MemoryStorage.js'
 import type { Runtime } from './Runtime.js'
 import type {
   WorkflowInstance,
+  WorkflowStatus,
+  EngineRef,
   IncomingEvent,
   InstanceFilter,
-  NodeConfig,
   EffectOutcome,
   EventResult,
   InstanceStore,
   TransitionListener,
   LifecycleListener,
   EffectFailedListener,
+  AutomationFailedListener,
 } from './types.js'
 
 export interface EngineInitConfig {
@@ -30,9 +32,6 @@ export interface EngineInitConfig {
 
 /**
  * Serializes a caught error to a plain string, safe across VM realm boundaries.
- * In Node.js vm.createContext(), thrown Error objects have a different prototype
- * chain than the host's Error — instanceof checks fail. Access .message and .name
- * as plain properties instead.
  */
 function serializeError(err: unknown): string {
   if (err == null) return 'Unknown error'
@@ -51,71 +50,87 @@ export class Engine {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _runtime!:  Runtime<any>
   private storage!:   InstanceStore
+  private skipRaci =  false
+
+  // ── Listeners ─────────────────────────────────────────────────────────────
+  private readonly _transitionListeners:       TransitionListener[]       = []
+  private readonly _createdListeners:          LifecycleListener[]        = []
+  private readonly _completedListeners:        LifecycleListener[]        = []
+  private readonly _cancelledListeners:        LifecycleListener[]        = []
+  private readonly _effectFailedListeners:     EffectFailedListener[]     = []
+  private readonly _automationFailedListeners: AutomationFailedListener[] = []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   get runtime(): Runtime<any> { return this._runtime }
-  private skipRaci =  false
 
-  private readonly transitionListeners:   TransitionListener[]   = []
-  private readonly createdListeners:      LifecycleListener[]    = []
-  private readonly completedListeners:    LifecycleListener[]    = []
-  private readonly effectFailedListeners: EffectFailedListener[] = []
+  /** Namespaced workflow instance operations. */
+  readonly workflows: {
+    create(workflowId: string, trackedAsset: WorkflowInstance['trackedAsset'], initiatedBy: string): Promise<WorkflowInstance | null>
+    emit(instanceId: string, event: IncomingEvent): Promise<EventResult>
+    get(instanceId: string): Promise<WorkflowInstance | null>
+    list(filter?: InstanceFilter): Promise<WorkflowInstance[]>
+    delete(instanceId: string): Promise<void>
+    cancel(instanceId: string): Promise<void>
+    getStatus(instanceId: string): Promise<WorkflowStatus | null>
+    resolveContext(instanceId: string): Promise<Record<string, unknown>>
+    onTransition(listener: TransitionListener): Engine
+    onCreated(listener: LifecycleListener): Engine
+    onCompleted(listener: LifecycleListener): Engine
+    onCancelled(listener: LifecycleListener): Engine
+    onEffectFailed(listener: EffectFailedListener): Engine
+    onAutomationFailed(listener: AutomationFailedListener): Engine
+  }
 
-  /**
-   * Called internally by Bep — injects the BEP data getter and history resolver.
-   * Use bep.engine.init() to configure the runtime and storage before operating.
-   */
   constructor(getBep: () => BEP, getHistoricalBep?: (version: string) => Promise<BEP>) {
     this.getBep           = getBep
     this.getHistoricalBep = getHistoricalBep
+
+    this.workflows = {
+      create:            (wId, asset, by)  => this._create(wId, asset, by),
+      emit:              (iId, event)      => this._emit(iId, event),
+      get:               (iId)             => this._get(iId),
+      list:              (filter)          => this._list(filter),
+      delete:            (iId)             => this._delete(iId),
+      cancel:            (iId)             => this._cancel(iId),
+      getStatus:         (iId)             => this._getStatus(iId),
+      resolveContext:    (iId)             => this._resolveContext(iId),
+      onTransition:      (l)              => { this._transitionListeners.push(l);       return this },
+      onCreated:         (l)              => { this._createdListeners.push(l);          return this },
+      onCompleted:       (l)              => { this._completedListeners.push(l);        return this },
+      onCancelled:       (l)              => { this._cancelledListeners.push(l);        return this },
+      onEffectFailed:    (l)              => { this._effectFailedListeners.push(l);     return this },
+      onAutomationFailed:(l)              => { this._automationFailedListeners.push(l); return this },
+    }
   }
 
   /**
    * Configures the engine with a runtime and storage backend.
-   * Must be called before any operations (createInstance, emit, etc.).
+   * Must be called before any operations (workflows.create, workflows.emit, etc.).
    * Returns `this` for chaining.
    */
   init(config: EngineInitConfig): this {
     this._runtime = config.runtime
     this.storage  = config.storage ?? new MemoryStorage()
     this.skipRaci = config.events?.skipRaci ?? false
+    // Inject engine reference into runtime so handlers can call this.engine.*
+    ;(config.runtime as unknown as { _engine?: EngineRef })._engine = this
     return this
   }
 
-  // ─── Lifecycle listeners ─────────────────────────────────────────────────────
+  // ─── Remote data ──────────────────────────────────────────────────────────
 
-  /** Fires after every successful emit() — all listeners run concurrently. */
-  onTransition(listener: TransitionListener): this {
-    this.transitionListeners.push(listener)
-    return this
+  async getRemoteData(remoteDataId: string): Promise<unknown> {
+    this._assertInit()
+    const bep    = this.getBep()
+    const remote = bep.remoteData.find(r => r.id === remoteDataId)
+    if (!remote)            throw new Error(`Remote data "${remoteDataId}" not found in BEP`)
+    if (!remote.resolverId) throw new Error(`Remote data "${remoteDataId}" has no resolver assigned`)
+    return this._runtime._runResolver(remote.resolverId, remote.url)
   }
 
-  /** Fires after createInstance() persists the new instance. */
-  onInstanceCreated(listener: LifecycleListener): this {
-    this.createdListeners.push(listener)
-    return this
-  }
+  // ─── Private workflow instance operations ─────────────────────────────────
 
-  /** Fires when instance.status becomes 'completed'. */
-  onInstanceCompleted(listener: LifecycleListener): this {
-    this.completedListeners.push(listener)
-    return this
-  }
-
-  /** Fires when an effect handler throws or returns status 'failed'. */
-  onEffectFailed(listener: EffectFailedListener): this {
-    this.effectFailedListeners.push(listener)
-    return this
-  }
-
-  // ─── Operations ─────────────────────────────────────────────────────────────
-
-  /**
-   * Creates a new workflow instance positioned at the first node after start and persists it.
-   * Records the current BEP version on the instance for historical resolution.
-   * Returns null if the workflowId does not exist or has no start node.
-   */
-  async createInstance(
+  private async _create(
     workflowId: string,
     trackedAsset: WorkflowInstance['trackedAsset'],
     initiatedBy: string,
@@ -130,12 +145,10 @@ export class Engine {
       await this._executeEffect(instance, ef)
     }
 
-    // If the first node after start is an automation, execute it immediately —
-    // same loop as emit() uses for automation nodes reached via transitions.
     const workflow  = bep.workflows.find(w => w.id === workflowId)
     const firstNode = workflow?.diagram.nodes[instance.currentNodeId]
     let automationPending = firstNode?.type === 'automation' && firstNode.automationId
-      ? { automationId: firstNode.automationId }
+      ? { automationId: firstNode.automationId, triggerPayload: {} as Record<string, unknown> }
       : undefined
 
     let current = instance
@@ -143,8 +156,8 @@ export class Engine {
     let serviceDepth = 0
 
     while (automationPending && serviceDepth++ < MAX_SERVICE_DEPTH) {
-      const { automationId } = automationPending
-      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId)
+      const { automationId, triggerPayload } = automationPending
+      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId, triggerPayload)
       const autoResult = processEvent(bep, current, {
         eventId,
         actor:      '_system',
@@ -160,22 +173,11 @@ export class Engine {
     }
 
     await this.storage.saveInstance(current)
-    await this._fire(this.createdListeners, current)
+    await this._fire(this._createdListeners, current)
     return current
   }
 
-  /**
-   * Emits an event against a workflow instance.
-   *
-   * 1. Loads the instance from storage.
-   * 2. Resolves the BEP version the instance was created against.
-   * 3. Processes the event (pure transition logic — transitions + decision auto-traversal).
-   * 4. Persists the updated instance.
-   * 5. Executes effect handlers declared in the runtime.
-   * 6. Fires lifecycle listeners concurrently.
-   * 7. Returns the result with the updated instance and effect outcomes.
-   */
-  async emit(instanceId: string, event: IncomingEvent): Promise<EventResult> {
+  private async _emit(instanceId: string, event: IncomingEvent): Promise<EventResult> {
     this._assertInit()
     const instance = await this.storage.getInstance(instanceId)
     if (!instance) return { ok: false, error: 'NO_MATCHING_EDGE' }
@@ -193,12 +195,11 @@ export class Engine {
       allEffects.push(await this._executeEffect(current, ef))
     }
 
-    // Auto-execute automation nodes — loop in case an automation leads to another automation
     const MAX_SERVICE_DEPTH = 10
     let serviceDepth = 0
     while (result.automationNodePending && serviceDepth++ < MAX_SERVICE_DEPTH) {
-      const { automationId } = result.automationNodePending
-      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId)
+      const { automationId, triggerPayload } = result.automationNodePending
+      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId, triggerPayload)
 
       result = processEvent(bep, current, {
         eventId,
@@ -218,9 +219,9 @@ export class Engine {
 
     await this.storage.saveInstance(current)
 
-    await this._fire(this.transitionListeners, current, allTransitions, allEffects)
+    await this._fire(this._transitionListeners, current, allTransitions, allEffects)
     if (current.status === 'completed') {
-      await this._fire(this.completedListeners, current)
+      await this._fire(this._completedListeners, current)
     }
 
     return {
@@ -231,19 +232,12 @@ export class Engine {
     }
   }
 
-  // ─── Read ────────────────────────────────────────────────────────────────────
-
-  async getInstance(instanceId: string): Promise<WorkflowInstance | null> {
+  private async _get(instanceId: string): Promise<WorkflowInstance | null> {
     this._assertInit()
     return this.storage.getInstance(instanceId)
   }
 
-  /**
-   * Returns instances matching the filter.
-   * `pendingActionFor` (Member.email) is resolved at the Engine level using
-   * the BEP RACI data — the storage layer does not need to understand it.
-   */
-  async getInstances(filter?: InstanceFilter): Promise<WorkflowInstance[]> {
+  private async _list(filter?: InstanceFilter): Promise<WorkflowInstance[]> {
     this._assertInit()
     const { pendingActionFor, ...storageFilter } = filter ?? {}
     const instances = await this.storage.listInstances(storageFilter)
@@ -267,40 +261,47 @@ export class Engine {
     })
   }
 
-  /**
-   * Returns what a specific actor can do from the current node of an instance.
-   * Returns null if the instance does not exist.
-   */
-  async getNodeConfig(instanceId: string, actorEmail: string): Promise<NodeConfig | null> {
-    this._assertInit()
-    const instance = await this.storage.getInstance(instanceId)
-    if (!instance) return null
-    const bep = await this._resolveBep(instance.bepVersion)
-    return _getNodeConfig(bep, instance, actorEmail)
-  }
-
-  async deleteInstance(instanceId: string): Promise<void> {
+  private async _delete(instanceId: string): Promise<void> {
     this._assertInit()
     await this.storage.deleteInstance(instanceId)
   }
 
-  /**
-   * Runs the resolver declared for a remote data source and returns the raw payload.
-   * Throws if the remoteDataId does not exist in the BEP or has no resolver assigned.
-   */
-  async getRemoteData(remoteDataId: string): Promise<unknown> {
+  private async _cancel(instanceId: string): Promise<void> {
     this._assertInit()
-    const bep    = this.getBep()
-    const remote = bep.remoteData.find(r => r.id === remoteDataId)
-    if (!remote)            throw new Error(`Remote data "${remoteDataId}" not found in BEP`)
-    if (!remote.resolverId) throw new Error(`Remote data "${remoteDataId}" has no resolver assigned`)
-    return this._runtime._runResolver(remote.resolverId, remote.url)
+    const instance = await this.storage.getInstance(instanceId)
+    if (!instance || instance.status !== 'active') return
+    const cancelled: WorkflowInstance = {
+      ...instance,
+      status:    'cancelled',
+      updatedAt: new Date().toISOString(),
+    }
+    await this.storage.saveInstance(cancelled)
+    await this._fire(this._cancelledListeners, cancelled)
   }
 
-  // ─── Internal ────────────────────────────────────────────────────────────────
+  private async _getStatus(instanceId: string): Promise<WorkflowStatus | null> {
+    this._assertInit()
+    const instance = await this.storage.getInstance(instanceId)
+    if (!instance) return null
+    const bep = await this._resolveBep(instance.bepVersion)
+    return _getWorkflowStatus(bep, instance)
+  }
+
+  private async _resolveContext(instanceId: string): Promise<Record<string, unknown>> {
+    this._assertInit()
+    const instance = await this.storage.getInstance(instanceId)
+    if (!instance) return {}
+    const result: Record<string, unknown> = {}
+    for (const event of instance.history) {
+      Object.assign(result, event.trigger.payload ?? {})
+    }
+    return result
+  }
+
+  // ─── Internal helpers ─────────────────────────────────────────────────────
 
   private _assertInit(): void {
-    if (!this.runtime || !this.storage) {
+    if (!this._runtime || !this.storage) {
       throw new Error('Engine not initialized — call bep.engine.init({ runtime, storage }) first.')
     }
   }
@@ -319,57 +320,41 @@ export class Engine {
     await Promise.allSettled(listeners.map(fn => fn(...args)))
   }
 
-  private _resolveFromHistory(key: string, history: WorkflowInstance['history']): unknown {
-    for (let i = history.length - 1; i >= 0; i--) {
-      const payload = history[i]!.trigger.payload ?? {}
-      if (key in payload) return payload[key]
-    }
-    return undefined
-  }
-
   private async _executeAutomationNode(
     instance: WorkflowInstance,
     automationId: string,
+    triggerPayload: Record<string, unknown>,
   ): Promise<{ eventId: string } & Record<string, unknown>> {
-    const bep           = this.getBep()
-    const automationDef = bep.automations.find(s => s.id === automationId)
-    const fields        = automationDef?.payload ?? []
-    const payload       = Object.fromEntries(fields.map(f => [f.key, this._resolveFromHistory(f.key, instance.history)]))
-
     const handler = this._runtime.automations[automationId]
     if (!handler) throw new Error(`No handler declared for automation "${automationId}"`)
-    return handler(instance, payload)
+    try {
+      return await handler(instance, triggerPayload)
+    } catch (error) {
+      await this._fire(this._automationFailedListeners, instance, automationId, serializeError(error))
+      throw error
+    }
   }
 
   private async _executeEffect(
     instance: WorkflowInstance,
-    ef: { effectId: string; fromEdgeId: string },
+    ef: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> },
   ): Promise<EffectOutcome> {
-    const bep       = this.getBep()
-    const effectDef = bep.effects.find(e => e.id === ef.effectId)
-    const fields    = effectDef?.payload ?? []
-
-    const missing = fields
-      .filter(f => f.required && this._resolveFromHistory(f.key, instance.history) === undefined)
-      .map(f => f.key)
-
-    if (missing.length > 0) {
-      return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped', missingFields: missing }
-    }
-
     const handler = this._runtime.effects[ef.effectId]
     if (!handler) {
       return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped' }
     }
 
-    const payload = Object.fromEntries(fields.map(f => [f.key, this._resolveFromHistory(f.key, instance.history)]))
-
     try {
-      await handler(instance, payload)
+      await handler(instance, ef.triggerPayload)
       return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'executed' }
     } catch (error) {
-      const outcome: EffectOutcome = { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'failed', error: serializeError(error) }
-      await this._fire(this.effectFailedListeners, instance, outcome)
+      const outcome: EffectOutcome = {
+        effectId:    ef.effectId,
+        fromEdgeId:  ef.fromEdgeId,
+        status:      'failed',
+        error:       serializeError(error),
+      }
+      await this._fire(this._effectFailedListeners, instance, outcome)
       return outcome
     }
   }

@@ -7,7 +7,7 @@ import type {
   TransitionEvent,
   WorkflowInstance,
   InstanceStatus,
-  NodeConfig,
+  WorkflowStatus,
   RoleRef,
   TeamRef,
   RaciLevel,
@@ -135,9 +135,9 @@ export interface ProcessEventResult {
   /** Ordered list of transitions applied (may include decision auto-traversals). */
   transitionsApplied?: TransitionStep[]
   /** Effects to execute after the transition. Caller is responsible for firing them. */
-  effectsToFire?: { effectId: string; fromEdgeId: string }[]
+  effectsToFire?: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> }[]
   /** Present when the final node is an automation node — Engine must execute the automation then emit the returned eventId. */
-  automationNodePending?: { nodeId: string; automationId: string }
+  automationNodePending?: { nodeId: string; automationId: string; triggerPayload: Record<string, unknown> }
   error?: ProcessEventError
   /** Present when error = 'INVALID_PAYLOAD'. */
   payloadErrors?: PayloadFieldError[]
@@ -160,7 +160,7 @@ export function createInstance(
   trackedAsset: WorkflowInstance['trackedAsset'],
   initiatedBy: string,
   bepVersion: string,
-): { instance: WorkflowInstance; startEffects: { effectId: string; fromEdgeId: string }[] } | null {
+): { instance: WorkflowInstance; startEffects: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> }[] } | null {
   const workflow = bep.workflows.find(w => w.id === workflowId)
   if (!workflow) return null
 
@@ -173,7 +173,7 @@ export function createInstance(
   const startEdgeEntry = Object.entries(workflow.diagram.edges).find(([, e]) => e.from === startNodeId)
   const firstNodeId = startEdgeEntry?.[1].to ?? startNodeId
   const startEffects = startEdgeEntry
-    ? (startEdgeEntry[1].effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: startEdgeEntry[0] }))
+    ? (startEdgeEntry[1].effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: startEdgeEntry[0], triggerPayload: {} as Record<string, unknown> }))
     : []
 
   const now = new Date().toISOString()
@@ -225,7 +225,7 @@ export function processEvent(
   // Working state — assembled immutably into the final instance at the end.
   let currentNodeId = instance.currentNodeId
   const newHistory: TransitionEvent[] = []
-  const effectsToFire: { effectId: string; fromEdgeId: string }[] = []
+  const effectsToFire: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> }[] = []
   const transitionsApplied: TransitionStep[] = []
 
   // ── Step 1: match an edge from the current node ───────────────────────────
@@ -245,7 +245,7 @@ export function processEvent(
   }
 
   newHistory.push(buildTransitionEvent(edgeId, currentNodeId, edge.to, event))
-  effectsToFire.push(...(edge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: edgeId })))
+  effectsToFire.push(...(edge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: edgeId, triggerPayload: event.payload ?? {} })))
   transitionsApplied.push({ edgeId, fromNodeId: currentNodeId, toNodeId: edge.to })
   currentNodeId = edge.to
 
@@ -272,7 +272,7 @@ export function processEvent(
     const [decEdgeId, decEdge] = outgoing[0]!
 
     newHistory.push(buildTransitionEvent(decEdgeId, currentNodeId, decEdge.to, event, true))
-    effectsToFire.push(...(decEdge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: decEdgeId })))
+    effectsToFire.push(...(decEdge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: decEdgeId, triggerPayload: event.payload ?? {} })))
     transitionsApplied.push({ edgeId: decEdgeId, fromNodeId: currentNodeId, toNodeId: decEdge.to })
     currentNodeId = decEdge.to
   }
@@ -291,33 +291,26 @@ export function processEvent(
   }
 
   const automationNodePending = finalNode?.type === 'automation' && finalNode.automationId
-    ? { nodeId: currentNodeId, automationId: finalNode.automationId }
+    ? { nodeId: currentNodeId, automationId: finalNode.automationId, triggerPayload: event.payload ?? {} }
     : undefined
 
   return { ok: true, instance: updatedInstance, transitionsApplied, effectsToFire, automationNodePending }
 }
 
-// ─── Node config ──────────────────────────────────────────────────────────────
+// ─── Workflow status ──────────────────────────────────────────────────────────
 
 /**
- * Returns what a specific actor can do from the current node of an instance.
- * Used by apps to render only the actions available to the logged-in user.
+ * Returns the current state of a workflow instance: active node, all outgoing
+ * transitions, and resolved RACI. Actor-independent — authorization is enforced
+ * at emit() time, not here.
  */
-export function getNodeConfig(
+export function getWorkflowStatus(
   bep: BEP,
   instance: WorkflowInstance,
-  actorEmail: string,
-): NodeConfig {
+): WorkflowStatus {
   const workflow = bep.workflows.find(w => w.id === instance.workflowId)!
   const { nodes, edges } = workflow.diagram
   const currentNode = nodes[instance.currentNodeId]!
-
-  // Resolve actor profile.
-  const member      = bep.members.find(m => m.email === actorEmail)
-  const actorRoleId = member?.roleId
-  const actorTeamIds = new Set(
-    bep.teams.filter(t => (t.memberEmails ?? []).includes(actorEmail)).map(t => t.id)
-  )
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -341,87 +334,28 @@ export function getNodeConfig(
     emails: emails ?? [],
   })
 
-  /**
-   * Three-level authorization check for a single RACI letter (R or A).
-   * Only call this when the letter has at least one constraint defined.
-   *   1. Email match — explicit member, always authorized.
-   *   2. Team + Role — actor must be in a listed team AND have a listed role.
-   *   3. Team only   — actor must be in a listed team.
-   *   4. Role only   — actor must have a listed role.
-   */
-  const matchesConstraints = (
-    roleIds?: string[], teamIds?: string[], emails?: string[],
-  ): boolean => {
-    if (emails?.includes(actorEmail)) return true
-    const hasRoles = !!roleIds?.length
-    const hasTeams = !!teamIds?.length
-    if (hasTeams && hasRoles) {
-      return (
-        !!actorRoleId && roleIds!.includes(actorRoleId) &&
-        teamIds!.some(tid => actorTeamIds.has(tid))
-      )
-    }
-    if (hasTeams) return teamIds!.some(tid => actorTeamIds.has(tid))
-    if (hasRoles) return !!actorRoleId && roleIds!.includes(actorRoleId)
-    return false
-  }
-
-  const raciNode = currentNode.type === 'process' ? currentNode : null
-
-  const hasResponsible = !!(
-    raciNode?.responsibleRoleIds?.length ||
-    raciNode?.responsibleTeamIds?.length ||
-    raciNode?.responsibleEmails?.length
-  )
-  const hasAccountable = !!(
-    raciNode?.accountableRoleIds?.length ||
-    raciNode?.accountableTeamIds?.length ||
-    raciNode?.accountableEmails?.length
-  )
-
-  // No R or A defined on the node → open to anyone.
-  // Otherwise actor must satisfy at least one of the defined constraints.
-  const actorIsAuthorized =
-    (!hasResponsible && !hasAccountable) ||
-    (hasResponsible && matchesConstraints(raciNode?.responsibleRoleIds, raciNode?.responsibleTeamIds, raciNode?.responsibleEmails)) ||
-    (hasAccountable && matchesConstraints(raciNode?.accountableRoleIds, raciNode?.accountableTeamIds, raciNode?.accountableEmails))
-
-  // Resolve required payload fields from the global FlowEvent catalog.
   const resolvePayload = (eventId: string) =>
     (bep.events.find(e => e.id === eventId)?.payload ?? []).map(p => ({
       key:      p.key,
       type:     p.type,
       required: p.required,
+      label:    p.label,
     }))
 
-  const availableTransitions: NodeConfig['availableTransitions'] = []
-  const blockedTransitions:   NodeConfig['blockedTransitions']   = []
+  const raciNode = currentNode.type === 'process' ? currentNode : null
+
+  const transitions: WorkflowStatus['transitions'] = []
 
   for (const [edgeId, edge] of Object.entries(edges)) {
     if (edge.from !== instance.currentNodeId) continue
     if (!('triggerEventId' in edge)) continue
-
     const eventId = edge.triggerEventId
-
-    if (actorIsAuthorized) {
-      availableTransitions.push({
-        edgeId,
-        label:           edge.label ?? eventId,
-        emits:           eventId,
-        requiredPayload: resolvePayload(eventId),
-      })
-    } else {
-      blockedTransitions.push({
-        edgeId,
-        label:    edge.label ?? eventId,
-        reason:   'UNAUTHORIZED',
-        required: buildRaciLevel(
-          [...(raciNode?.responsibleRoleIds ?? []), ...(raciNode?.accountableRoleIds ?? [])],
-          [...(raciNode?.responsibleTeamIds ?? []), ...(raciNode?.accountableTeamIds ?? [])],
-          [...(raciNode?.responsibleEmails  ?? []), ...(raciNode?.accountableEmails  ?? [])],
-        ),
-      })
-    }
+    transitions.push({
+      edgeId,
+      label:           edge.label ?? eventId,
+      emits:           eventId,
+      requiredPayload: resolvePayload(eventId),
+    })
   }
 
   return {
@@ -430,8 +364,8 @@ export function getNodeConfig(
       type:  currentNode.type,
       label: instance.currentNodeId,
     },
-    availableTransitions,
-    blockedTransitions,
+    status: instance.status,
+    transitions,
     raci: {
       responsible: buildRaciLevel(raciNode?.responsibleRoleIds, raciNode?.responsibleTeamIds, raciNode?.responsibleEmails),
       accountable:  buildRaciLevel(raciNode?.accountableRoleIds, raciNode?.accountableTeamIds, raciNode?.accountableEmails),

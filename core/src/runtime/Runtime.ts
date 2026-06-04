@@ -1,4 +1,4 @@
-import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler } from './types.js'
+import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, EngineRef } from './types.js'
 
 export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
@@ -49,6 +49,13 @@ export class Runtime<T extends {
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
   readonly resolvers:   Record<string, ResolverHandler>   = {}
+
+  /** Set by Engine.init() — available inside handlers via this.engine */
+  _engine: EngineRef | null = null
+  get engine(): EngineRef {
+    if (!this._engine) throw new Error('engine is not available yet — it is set during Engine.init()')
+    return this._engine
+  }
 
   constructor({ env = {} }: RuntimeOptions = {}) {
     this.env = env

@@ -127,30 +127,23 @@ export interface RaciLevel {
   emails:  string[]
 }
 
-/** Describes what a specific actor can do from the current node of an instance. */
-export interface NodeConfig {
+/** Current state of a workflow instance — node, transitions, and RACI. Actor-independent. */
+export interface WorkflowStatus {
   currentNode: {
     id: string
     type: string
     label: string
   }
 
-  /** Transitions this actor can trigger right now. */
-  availableTransitions: {
+  status: InstanceStatus
+
+  /** All transitions available from the current node. Authorization is enforced at emit() time. */
+  transitions: {
     edgeId: string
     label: string
     /** eventId to emit */
     emits: string
-    requiredPayload: { key: string; type: string; required: boolean }[]
-  }[]
-
-  /** Transitions that exist but this actor cannot trigger. */
-  blockedTransitions: {
-    edgeId: string
-    label: string
-    reason: 'UNAUTHORIZED' | 'GUARD_UNSATISFIABLE'
-    /** What the node requires to authorize this transition. */
-    required: RaciLevel
+    requiredPayload: { key: string; type: string; required: boolean; label?: string }[]
   }[]
 
   /** RACI assignment for the current node — resolved to roles, teams and emails. */
@@ -163,6 +156,13 @@ export interface NodeConfig {
 
   /** True if the current node is type "end". */
   isTerminal: boolean
+}
+
+/** Minimal engine reference available to runtime handlers via this.engine. */
+export interface EngineRef {
+  workflows: {
+    resolveContext(instanceId: string): Promise<Record<string, unknown>>
+  }
 }
 
 // ─── Engine result types ──────────────────────────────────────────────────────
@@ -223,10 +223,8 @@ export type AutomationHandler = (
 export interface EffectOutcome {
   effectId: string
   fromEdgeId: string
-  /** executed = handler ran ok | skipped = no handler or missing required fields | failed = handler threw */
+  /** executed = handler ran ok | skipped = no handler registered | failed = handler threw */
   status: 'executed' | 'skipped' | 'failed'
-  /** Required context fields that were missing. Present when status = 'skipped'. */
-  missingFields?: string[]
   /** Error message thrown by the handler. Present when status = 'failed'. */
   error?: string
 }
@@ -258,6 +256,13 @@ export type LifecycleListener = (instance: WorkflowInstance) => Promise<void>
 export type EffectFailedListener = (
   instance: WorkflowInstance,
   outcome: EffectOutcome,
+) => Promise<void>
+
+/** Fires when an automation handler throws. */
+export type AutomationFailedListener = (
+  instance: WorkflowInstance,
+  automationId: string,
+  error: string,
 ) => Promise<void>
 
 // ─── Storage interface ────────────────────────────────────────────────────────
