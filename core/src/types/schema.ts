@@ -47,6 +47,12 @@ export const ProjectSchema = z.object({
   description: z.string().optional(),
   image: z.string().optional(),
   websiteUrl: z.url().optional(),
+  location: z.object({
+    address:     z.string().optional(),
+    coordinates: z.tuple([z.number(), z.number()]).optional()
+      .describe('[longitude, latitude] — GeoJSON order'),
+  }).optional(),
+  customData: z.record(z.string(), z.unknown()).optional(),
 }).describe('General metadata about the construction project the BEP belongs to.')
 
 export type Project = z.infer<typeof ProjectSchema>
