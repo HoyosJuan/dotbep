@@ -17,7 +17,6 @@ docs/    — format and schema documentation (MD)
 - `core/src/utils/nomenclature.ts` — `buildConsecutivoMap`, `getNomenCode`, `buildCodeMap`
 - `core/src/utils/normalize.ts` — `normalizeBep`
 - `core/src/utils/diff.ts` — `diffEntities`, `arrayDefs`, `diffBep`
-- `core/src/utils/mermaid.ts` — `flowDiagramToMermaid`
 - `core/example.ts` — exhaustive API usage example (`npm run example`)
 
 ### Root scripts
