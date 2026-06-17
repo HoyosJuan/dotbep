@@ -32,6 +32,17 @@ npm run schema:diagram # generates schema ER diagram (schema.html)
 
 ---
 
+## Rule: running examples
+
+Before executing any file in `core/examples/`, always follow these steps in order:
+
+1. `npm run build:core` from the repo root (`core/`) — the examples import from `../dist/index.js`
+2. Type-check the example: `npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck examples/<file>.ts` (run from `core/core/`)
+3. Fix any type errors before running
+4. Execute: `node --experimental-strip-types examples/<file>.ts` (run from `core/core/`)
+
+---
+
 ## Rule: schema changes
 
 Any modification to `core/src/types/schema.ts` requires analyzing the full impact before applying the change.
