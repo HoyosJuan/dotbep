@@ -62,8 +62,11 @@ bep.remoteData.add([
   },
 ])
 
+bep.softwares.add([{ id: 'notion', name: 'Notion', version: '1.0' }])
+
 const [{ id: workflowId }] = bep.workflows.add([{
   name: 'Model Review',
+  description: 'Tracks the review and approval cycle for a BIM model submitted by the team.',
   diagram: {
     direction: 'LR',
     nodes: {
@@ -80,8 +83,8 @@ const [{ id: workflowId }] = bep.workflows.add([{
 
 // ─── 2. Generate types ────────────────────────────────────────────────────────
 //
-// bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's effects and
-// automations. Commit bep.d.ts alongside your runtime so TypeScript can validate it.
+// bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's runtime.
+// Commit bep.d.ts alongside your runtime so TypeScript can validate it.
 
 writeFileSync('examples/bep.d.ts', bep.generateRuntimeTypes())
 console.log('Generated examples/bep.d.ts')
@@ -105,6 +108,18 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
     this.resolver('fetch-json', async (url, env) => {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${env.API_KEY}` } })
       return res.json()
+    })
+    this.trigger('notion', async (rawPayload) => {
+      const p = rawPayload as Record<string, unknown>
+      return {
+        trackedAsset: {
+          assetTypeId: 'MDL',
+          source:      'external:notion',
+          id:          p['pageId'] as string ?? crypto.randomUUID(),
+          label:       p['title']  as string ?? 'Untitled',
+        },
+        workflowId,
+      }
     })
   }
 }
@@ -133,6 +148,16 @@ console.log('transitions:', result.transitionsApplied?.map(t => `${t.fromNodeId}
 console.log('effects:', result.effects?.map(e => `${e.effectId}: ${e.status}`))
 console.log('final node:', result.instance?.currentNodeId)
 console.log('final status:', result.instance?.status)
+
+console.log('\n=== create instance via trigger ===')
+const triggerInstance = await bep.engine.workflows.create(
+  'notion',
+  { rawPayload: { pageId: 'page-abc123', title: 'Foundation Rebar Model' } },
+  'dotBEP',
+)
+console.log('status:       ', triggerInstance!.status)
+console.log('workflowId:   ', triggerInstance!.workflowId)
+console.log('trackedAsset: ', triggerInstance!.trackedAsset)
 
 console.log('\n=== getRemoteData ===')
 const remoteDataId = bep.data.remoteData[0]!.id
