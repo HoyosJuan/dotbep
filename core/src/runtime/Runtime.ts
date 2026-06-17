@@ -4,7 +4,7 @@ export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
   automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
   resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
-  triggers:    Record<string, (rawPayload: unknown) => Promise<WorkflowInstance['trackedAsset']>>
+  triggers:    Record<string, (rawPayload: unknown) => Promise<{ trackedAsset: WorkflowInstance['trackedAsset']; workflowId: string }>>
   env:         Record<string, string>
 }
 
@@ -90,7 +90,7 @@ export class Runtime<T extends {
 
   protected trigger<K extends keyof T['triggers'] & string>(
     key: K,
-    handler: (rawPayload: unknown) => Promise<WorkflowInstance['trackedAsset']>,
+    handler: (...args: Parameters<T['triggers'][K]>) => ReturnType<T['triggers'][K]>,
   ): this {
     this.triggers[key] = handler as unknown as TriggerHandler
     return this

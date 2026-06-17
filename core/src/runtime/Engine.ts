@@ -65,7 +65,7 @@ export class Engine {
 
   /** Namespaced workflow instance operations. */
   readonly workflows: {
-    create(workflowId: string, trackedAsset: WorkflowInstance['trackedAsset'] | { rawPayload: unknown }, initiatedBy: string): Promise<WorkflowInstance | null>
+    create(id: string, trackedAsset: WorkflowInstance['trackedAsset'] | { rawPayload: unknown }, initiatedBy: string): Promise<WorkflowInstance | null>
     emit(instanceId: string, event: IncomingEvent): Promise<EventResult>
     get(instanceId: string): Promise<WorkflowInstance | null>
     list(filter?: InstanceFilter): Promise<WorkflowInstance[]>
@@ -131,20 +131,25 @@ export class Engine {
   // ─── Private workflow instance operations ─────────────────────────────────
 
   private async _create(
-    workflowId: string,
+    id: string,
     trackedAsset: WorkflowInstance['trackedAsset'] | { rawPayload: unknown },
     initiatedBy: string,
   ): Promise<WorkflowInstance | null> {
     this._assertInit()
 
     let resolvedAsset: WorkflowInstance['trackedAsset']
+    let workflowId: string
     if ('rawPayload' in trackedAsset) {
-      const handler = this._runtime.triggers[workflowId]
-      if (!handler) throw new Error(`No trigger handler declared for workflow "${workflowId}"`)
-      resolvedAsset = await handler(trackedAsset.rawPayload)
-      initiatedBy   = 'dotBEP'
+      // Trigger path: id is the softwareId; handler resolves both asset and workflowId.
+      const handler = this._runtime.triggers[id]
+      if (!handler) throw new Error(`No trigger handler declared for software "${id}"`)
+      const resolved = await handler(trackedAsset.rawPayload)
+      resolvedAsset  = resolved.trackedAsset
+      workflowId     = resolved.workflowId
+      initiatedBy    = 'dotBEP'
     } else {
       resolvedAsset = trackedAsset
+      workflowId    = id
     }
 
     const bep        = this.getBep()
