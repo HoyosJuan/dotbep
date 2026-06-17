@@ -65,7 +65,7 @@ export class Engine {
 
   /** Namespaced workflow instance operations. */
   readonly workflows: {
-    create(workflowId: string, trackedAsset: WorkflowInstance['trackedAsset'], initiatedBy: string): Promise<WorkflowInstance | null>
+    create(workflowId: string, trackedAsset: WorkflowInstance['trackedAsset'] | { rawPayload: unknown }, initiatedBy: string): Promise<WorkflowInstance | null>
     emit(instanceId: string, event: IncomingEvent): Promise<EventResult>
     get(instanceId: string): Promise<WorkflowInstance | null>
     list(filter?: InstanceFilter): Promise<WorkflowInstance[]>
@@ -132,13 +132,24 @@ export class Engine {
 
   private async _create(
     workflowId: string,
-    trackedAsset: WorkflowInstance['trackedAsset'],
+    trackedAsset: WorkflowInstance['trackedAsset'] | { rawPayload: unknown },
     initiatedBy: string,
   ): Promise<WorkflowInstance | null> {
     this._assertInit()
+
+    let resolvedAsset: WorkflowInstance['trackedAsset']
+    if ('rawPayload' in trackedAsset) {
+      const handler = this._runtime.triggers[workflowId]
+      if (!handler) throw new Error(`No trigger handler declared for workflow "${workflowId}"`)
+      resolvedAsset = await handler(trackedAsset.rawPayload)
+      initiatedBy   = 'dotBEP'
+    } else {
+      resolvedAsset = trackedAsset
+    }
+
     const bep        = this.getBep()
     const bepVersion = 'unversioned'
-    const result     = _createInstance(bep, workflowId, trackedAsset, initiatedBy, bepVersion)
+    const result     = _createInstance(bep, workflowId, resolvedAsset, initiatedBy, bepVersion)
     if (!result) return null
     const { instance, startEffects } = result
     for (const ef of startEffects) {
@@ -160,8 +171,8 @@ export class Engine {
       const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId, triggerPayload)
       const autoResult = processEvent(bep, current, {
         eventId,
-        actor:      '_system',
-        softwareId: '_system',
+        actor:      'dotBEP',
+        softwareId: 'dotBEP',
         payload:    automationPayload,
       })
       if (!autoResult.ok) break
@@ -203,8 +214,8 @@ export class Engine {
 
       result = processEvent(bep, current, {
         eventId,
-        actor:      '_system',
-        softwareId: '_system',
+        actor:      'dotBEP',
+        softwareId: 'dotBEP',
         payload:    automationPayload,
       })
 

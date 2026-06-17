@@ -1,9 +1,10 @@
-import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, EngineRef } from './types.js'
+import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, TriggerHandler, EngineRef } from './types.js'
 
 export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
   automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
   resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
+  triggers:    Record<string, (rawPayload: unknown) => Promise<WorkflowInstance['trackedAsset']>>
   env:         Record<string, string>
 }
 
@@ -42,6 +43,7 @@ export class Runtime<T extends {
   effects:     Record<string, any>
   automations: Record<string, any>
   resolvers:   Record<string, any>
+  triggers:    Record<string, any>
   env:         Record<string, any>
 } = BepTypes> {
   env: T['env']
@@ -49,6 +51,7 @@ export class Runtime<T extends {
   readonly effects:     Record<string, EffectHandler>     = {}
   readonly automations: Record<string, AutomationHandler> = {}
   readonly resolvers:   Record<string, ResolverHandler>   = {}
+  readonly triggers:    Record<string, TriggerHandler>    = {}
 
   /** Set by Engine.init() — available inside handlers via this.engine */
   _engine: EngineRef | null = null
@@ -85,6 +88,14 @@ export class Runtime<T extends {
     return this
   }
 
+  protected trigger<K extends keyof T['triggers'] & string>(
+    key: K,
+    handler: (rawPayload: unknown) => Promise<WorkflowInstance['trackedAsset']>,
+  ): this {
+    this.triggers[key] = handler as unknown as TriggerHandler
+    return this
+  }
+
   /** @internal Called by Engine.getRemoteData — keeps env encapsulated inside the Runtime. */
   _runResolver(id: string, url: string): Promise<unknown> {
     const handler = this.resolvers[id]
@@ -95,4 +106,4 @@ export class Runtime<T extends {
 }
 
 // Untyped aliases used internally by Engine (which works with the base contract)
-export type { EffectHandler, AutomationHandler, ResolverHandler }
+export type { EffectHandler, AutomationHandler, ResolverHandler, TriggerHandler }

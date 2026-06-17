@@ -220,6 +220,15 @@ export type AutomationHandler = (
   payload:  Record<string, unknown>,
 ) => Promise<{ eventId: string } & Record<string, unknown>>
 
+/**
+ * Handler registered for a specific workflow trigger (keyed by Workflow.id).
+ * Receives a raw payload from an external system and returns the trackedAsset
+ * that the engine will use to create the workflow instance.
+ */
+export type TriggerHandler = (
+  rawPayload: unknown,
+) => Promise<WorkflowInstance['trackedAsset']>
+
 export interface EffectOutcome {
   effectId: string
   fromEdgeId: string
