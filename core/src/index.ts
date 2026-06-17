@@ -141,10 +141,7 @@ export class Bep {
     this.deliverables   = new Deliverables(bep, () => this.teams, () => this.assetTypes, () => this.lbsNodes, () => this.milestones)
     this.notes          = new Notes(bep, () => this.members)
     this.flags          = new Flags(bep)
-    this.engine  = new Engine(
-      () => this._data,
-      (version) => this.history.get(version),
-    )
+    this.engine  = new Engine(() => this._data)
     this.history = new History(
       bep,
       (newBep) => { this._data = newBep },

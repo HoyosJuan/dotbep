@@ -50,24 +50,11 @@ export interface WorkflowInstance {
   id: string
   /** ref Workflow.id */
   workflowId: string
-  /** BEP version at the time this instance was created — used to load the correct workflow definition. */
-  bepVersion: string
 
   /** The asset this instance is tracking. */
-  trackedAsset: {
-    /** ref AssetType.id */
-    assetTypeId: string
-    /**
-     * Namespace that identifies where the asset lives.
-     * Format: "bep:<entityName>" for BEP-internal entities (e.g. "bep:deliverables"),
-     * or "external:<softwareId>" for assets in external systems (e.g. "external:software-acc").
-     * The softwareId must match a Software.id declared in the BEP (which cannot contain colons).
-     */
-    source: string
-    /** ID of the asset — ref to the entity within the source. */
-    id: string
-    label: string
-  }
+  trackedAsset:
+    | { source: 'internal'; type: 'deliverable'; id: string }
+    | { source: 'external'; url: string; label: string }
 
   /** Key of the current FlowNode. Not a decision node — engine auto-traverses those. */
   currentNodeId: string
@@ -96,9 +83,7 @@ export interface InstanceFilter {
   status?: InstanceStatus
   /** Member.email — returns instances where this actor has a pending RACI action. */
   pendingActionFor?: string
-  /** ref AssetType.id */
-  trackedAssetTypeId?: string
-  /** ID of the asset in the external system. */
+  /** ref internal asset id (e.g. Deliverable.id) — only matches source: 'internal' instances. */
   trackedAssetId?: string
 }
 

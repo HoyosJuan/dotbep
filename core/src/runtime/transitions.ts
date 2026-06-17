@@ -159,7 +159,6 @@ export function createInstance(
   workflowId: string,
   trackedAsset: WorkflowInstance['trackedAsset'],
   initiatedBy: string,
-  bepVersion: string,
 ): { instance: WorkflowInstance; startEffects: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> }[] } | null {
   const workflow = bep.workflows.find(w => w.id === workflowId)
   if (!workflow) return null
@@ -181,7 +180,6 @@ export function createInstance(
     instance: {
       id: globalThis.crypto.randomUUID(),
       workflowId,
-      bepVersion,
       trackedAsset,
       currentNodeId: firstNodeId,
       status: 'active',

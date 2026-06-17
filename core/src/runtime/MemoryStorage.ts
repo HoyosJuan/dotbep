@@ -12,8 +12,7 @@ export class MemoryStorage implements InstanceStore {
     let results = [...this.instances.values()]
     if (filter?.workflowId)    results = results.filter(i => i.workflowId === filter.workflowId)
     if (filter?.status)        results = results.filter(i => i.status === filter.status)
-    if (filter?.trackedAssetTypeId) results = results.filter(i => i.trackedAsset.assetTypeId === filter.trackedAssetTypeId)
-    if (filter?.trackedAssetId)     results = results.filter(i => i.trackedAsset.id === filter.trackedAssetId)
+    if (filter?.trackedAssetId) results = results.filter(i => i.trackedAsset.source === 'internal' && i.trackedAsset.id === filter.trackedAssetId)
     return results
   }
 

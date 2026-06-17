@@ -44,8 +44,7 @@ function serializeError(err: unknown): string {
 }
 
 export class Engine {
-  private readonly getBep:            () => BEP
-  private readonly getHistoricalBep?: (version: string) => Promise<BEP>
+  private readonly getBep: () => BEP
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _runtime!:  Runtime<any>
@@ -81,9 +80,8 @@ export class Engine {
     onAutomationFailed(listener: AutomationFailedListener): Engine
   }
 
-  constructor(getBep: () => BEP, getHistoricalBep?: (version: string) => Promise<BEP>) {
-    this.getBep           = getBep
-    this.getHistoricalBep = getHistoricalBep
+  constructor(getBep: () => BEP) {
+    this.getBep = getBep
 
     this.workflows = {
       create:            (wId, asset, by)  => this._create(wId, asset, by),
@@ -152,9 +150,8 @@ export class Engine {
       workflowId    = id
     }
 
-    const bep        = this.getBep()
-    const bepVersion = 'unversioned'
-    const result     = _createInstance(bep, workflowId, resolvedAsset, initiatedBy, bepVersion)
+    const bep    = this.getBep()
+    const result = _createInstance(bep, workflowId, resolvedAsset, initiatedBy)
     if (!result) return null
     const { instance, startEffects } = result
     for (const ef of startEffects) {
@@ -198,7 +195,7 @@ export class Engine {
     const instance = await this.storage.getInstance(instanceId)
     if (!instance) return { ok: false, error: 'NO_MATCHING_EDGE' }
 
-    const bep = await this._resolveBep(instance.bepVersion)
+    const bep = this.getBep()
     let result = processEvent(bep, instance, event, { skipRaci: this.skipRaci })
     if (!result.ok) return { ok: false, error: result.error, payloadErrors: result.payloadErrors }
 
@@ -299,7 +296,7 @@ export class Engine {
     this._assertInit()
     const instance = await this.storage.getInstance(instanceId)
     if (!instance) return null
-    const bep = await this._resolveBep(instance.bepVersion)
+    const bep = this.getBep()
     return _getWorkflowStatus(bep, instance)
   }
 
@@ -320,13 +317,6 @@ export class Engine {
     if (!this._runtime || !this.storage) {
       throw new Error('Engine not initialized — call bep.engine.init({ runtime, storage }) first.')
     }
-  }
-
-  private async _resolveBep(bepVersion: string): Promise<BEP> {
-    if (this.getHistoricalBep && bepVersion !== 'unversioned') {
-      return this.getHistoricalBep(bepVersion)
-    }
-    return this.getBep()
   }
 
   private async _fire<A extends unknown[]>(
