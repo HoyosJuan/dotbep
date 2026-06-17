@@ -4,7 +4,7 @@
 
 export interface BepWorkflows {
   /** Model Review — Tracks the review and approval cycle for a BIM model submitted by the team. */
-  'e959dc85-f72b-444c-b260-67107252c492': never
+  'cde6f273-35e8-4dce-87dd-9fcdc6f60bb7': never
 }
 export type WorkflowId = keyof BepWorkflows | (string & {})
 

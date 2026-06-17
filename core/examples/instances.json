@@ -1,0 +1,48 @@
+{
+  "1c938a6b-f268-4963-95b0-3137fa8d4204": {
+    "id": "1c938a6b-f268-4963-95b0-3137fa8d4204",
+    "workflowId": "cde6f273-35e8-4dce-87dd-9fcdc6f60bb7",
+    "trackedAsset": {
+      "source": "internal",
+      "type": "deliverable",
+      "id": "41d124ea-a046-4008-b6fe-f2fda7dbc338"
+    },
+    "currentNodeId": "end",
+    "status": "completed",
+    "history": [
+      {
+        "id": "01110d63-aa91-479a-a061-d4881c095dfb",
+        "edgeId": "e2",
+        "fromNodeId": "review",
+        "toNodeId": "end",
+        "trigger": {
+          "eventId": "submit",
+          "actor": "manager@demo.com",
+          "payload": {
+            "comment": "Ready for review"
+          }
+        },
+        "actor": "manager@demo.com",
+        "timestamp": "2026-06-17T23:05:35.325Z"
+      }
+    ],
+    "createdAt": "2026-06-17T23:05:35.320Z",
+    "updatedAt": "2026-06-17T23:05:35.325Z",
+    "initiatedBy": "manager@demo.com"
+  },
+  "650a2d7e-b0f8-43bd-9f46-c97af8a44612": {
+    "id": "650a2d7e-b0f8-43bd-9f46-c97af8a44612",
+    "workflowId": "cde6f273-35e8-4dce-87dd-9fcdc6f60bb7",
+    "trackedAsset": {
+      "source": "external",
+      "url": "https://notion.so/page-abc123",
+      "label": "Foundation Rebar Model"
+    },
+    "currentNodeId": "review",
+    "status": "active",
+    "history": [],
+    "createdAt": "2026-06-17T23:05:35.327Z",
+    "updatedAt": "2026-06-17T23:05:35.327Z",
+    "initiatedBy": "dotBEP"
+  }
+}

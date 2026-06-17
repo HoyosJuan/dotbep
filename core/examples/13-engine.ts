@@ -9,18 +9,63 @@
 //
 //   start ──► review ──[submit / effect: notify-reviewer]──► end
 
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
 import * as BEP from '../dist/index.js'
 import type { BepTypes } from './bep.js'
+
+// ─── JSON-backed instance store ───────────────────────────────────────────────
+
+const INSTANCES_PATH = 'examples/instances.json'
+
+writeFileSync(INSTANCES_PATH, '{}', 'utf8')
+
+class JsonStorage implements BEP.InstanceStore {
+  private _read(): Record<string, BEP.WorkflowInstance> {
+    return JSON.parse(readFileSync(INSTANCES_PATH, 'utf8'))
+  }
+  private _write(data: Record<string, BEP.WorkflowInstance>): void {
+    writeFileSync(INSTANCES_PATH, JSON.stringify(data, null, 2), 'utf8')
+  }
+  async listInstances(filter?: BEP.InstanceFilter): Promise<BEP.WorkflowInstance[]> {
+    let list = Object.values(this._read())
+    if (filter?.workflowId)         list = list.filter(i => i.workflowId === filter.workflowId)
+    if (filter?.status)             list = list.filter(i => i.status === filter.status)
+    if (filter?.trackedAssetId) list = list.filter(i => i.trackedAsset.source === 'internal' && i.trackedAsset.id === filter.trackedAssetId)
+    return list
+  }
+  async getInstance(id: string): Promise<BEP.WorkflowInstance | null> {
+    return this._read()[id] ?? null
+  }
+  async saveInstance(instance: BEP.WorkflowInstance): Promise<void> {
+    const data = this._read()
+    data[instance.id] = instance
+    this._write(data)
+  }
+  async deleteInstance(id: string): Promise<void> {
+    const data = this._read()
+    delete data[id]
+    this._write(data)
+  }
+}
 
 // ─── 1. Build the BEP ─────────────────────────────────────────────────────────
 
 const bep = BEP.Bep.create({ name: 'Demo Project', code: 'DEMO', description: '' })
 
-const [{ id: roleManagerId }]  = bep.roles.add([{ name: 'BIM Manager' }]).succeeded
+const [{ id: roleManagerId }]   = bep.roles.add([{ name: 'BIM Manager' }]).succeeded
 bep.members.add([{ email: 'manager@demo.com', name: 'Ana García', roleId: roleManagerId }])
-const [{ id: assetTypeId }]    = bep.assetTypes.add([{ id: 'MDL', name: 'Model' }]).succeeded
-const [{ id: actionReviewId }] = bep.actions.add([{ name: 'Review model' }]).succeeded
+bep.assetTypes.add([{ id: 'MDL', name: 'Model' }])
+const [{ id: actionReviewId }]  = bep.actions.add([{ name: 'Review model' }]).succeeded
+const [{ id: phaseId }]         = bep.phases.add([{ name: 'Design' }]).succeeded
+const [{ id: milestoneId }]     = bep.milestones.add([{ name: 'M1', date: '2025-06-01', phaseId }]).succeeded
+const [{ id: disciplineId }]    = bep.disciplines.add([{ id: 'ARC', name: 'Architecture' }]).succeeded
+const [{ id: teamId }]          = bep.teams.add([{ id: 'DSN', name: 'Design Team', isoRole: 'appointed-party', memberEmails: ['manager@demo.com'] }]).succeeded
+const [{ id: deliverableId }]   = bep.deliverables.add([{
+  disciplineId,
+  assetTypeId:   'MDL',
+  responsibleId: teamId,
+  milestoneId,
+}]).succeeded
 
 bep.events.add([
   { id: 'submit',   name: 'Submit for review', payload: [{ key: 'comment', type: 'string', required: false }] },
@@ -111,12 +156,12 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
     })
     this.trigger('notion', async (rawPayload) => {
       const p = rawPayload as Record<string, unknown>
+      const pageId = p['pageId'] as string ?? crypto.randomUUID()
       return {
         trackedAsset: {
-          assetTypeId: 'MDL',
-          source:      'external:notion',
-          id:          p['pageId'] as string ?? crypto.randomUUID(),
-          label:       p['title']  as string ?? 'Untitled',
+          source: 'external' as const,
+          url:    `https://notion.so/${pageId}`,
+          label:  p['title'] as string ?? 'Untitled',
         },
         workflowId,
       }
@@ -126,12 +171,12 @@ class MyRuntime extends BEP.Runtime<BepTypes> {
 
 // ─── 4. Init the engine and run ───────────────────────────────────────────────
 
-bep.engine.init({ runtime: new MyRuntime({ env: {API_KEY: "value"} }) })
+bep.engine.init({ runtime: new MyRuntime({ env: {API_KEY: "value"} }), storage: new JsonStorage() })
 
 console.log('\n=== create instance ===')
 const instance = await bep.engine.workflows.create(
   workflowId,
-  { assetTypeId, id: 'model-001', label: 'Structural Model v3', source: 'bep:deliverables' },
+  { source: 'internal' as const, type: 'deliverable' as const, id: deliverableId },
   'manager@demo.com',
 )
 console.log('status:', instance!.status)
