@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import type { BEP, NamingConvention, Project, Report } from './types/schema.js'
+import type { BEP, Memory, NamingConvention, Project, Report } from './types/schema.js'
 import { NamingConventionSchema, ProjectSchema } from './types/schema.js'
 import { normalizeBep } from './utils/normalize.js'
 import { validateTokenValue, validateAllTokens } from './utils/naming.js'
@@ -31,6 +31,7 @@ import { RemoteDataEntity } from './entities/remoteData.js'
 import { Resolvers } from './entities/resolvers.js'
 import { Softwares } from './entities/softwares.js'
 import { Reports } from './entities/reports.js'
+import { Memories } from './entities/memories.js'
 import { Standards } from './entities/standards.js'
 import { Teams } from './entities/teams.js'
 import { Workflows } from './entities/workflows.js'
@@ -72,6 +73,7 @@ export class Bep {
   readonly remoteData: RemoteDataEntity
   readonly resolvers: Resolvers
   readonly softwares: Softwares
+  readonly memories: Memories
   readonly reports: Reports
   readonly standards: Standards
   readonly teams: Teams
@@ -91,7 +93,6 @@ export class Bep {
 
   // ─── Project files ────────────────────────────────────────────────────────
 
-  readonly memory: TextFile
   readonly skill: TextFile
   readonly icon: TextFile
 
@@ -99,6 +100,7 @@ export class Bep {
     private _data: BEP,
     private _zip: JSZip,
     reportItems: Report[] = [],
+    memoryItems: Memory[] = [],
   ) {
     const bep = () => this._data
     this.project = new Singleton(
@@ -138,6 +140,7 @@ export class Bep {
     this.remoteData     = new RemoteDataEntity(bep)
     this.resolvers      = new Resolvers(bep)
     this.softwares      = new Softwares(bep, () => this.assetTypes)
+    this.memories       = new Memories(memoryItems, () => this._zip)
     this.reports        = new Reports(reportItems, bep, () => this._zip)
     this.standards      = new Standards(bep, () => this._zip)
     this.teams          = new Teams(bep, () => this.members)
@@ -152,7 +155,6 @@ export class Bep {
       () => this._zip,
     )
     this.nomenclature = new Nomenclature(bep)
-    this.memory = new TextFile('memory.md', () => this._zip)
     this.skill  = new TextFile('skills/bep-authoring/SKILL.md', () => this._zip)
     this.icon   = new TextFile('icon.svg',  () => this._zip)
   }
@@ -164,7 +166,7 @@ export class Bep {
    * The caller is responsible for obtaining the buffer (fs.readFile in Node,
    * fetch + arrayBuffer() in the browser, etc.).
    *
-   * Automatically initializes any missing files (memory.md, skills/bep-authoring/SKILL.md,
+   * Automatically initializes any missing files (skills/bep-authoring/SKILL.md,
    * standards content, baseline and v0.0 terminus) so the instance is always
    * fully operational after open(). Idempotent — existing files are untouched.
    */
@@ -179,7 +181,11 @@ export class Bep {
     const reportItems: Report[] = reportsFile
       ? JSON.parse(await reportsFile.async('string')) as Report[]
       : []
-    return new Bep(data, zip, reportItems)
+    const memoriesFile = zip.file('memories/index.json')
+    const memoryItems: Memory[] = memoriesFile
+      ? JSON.parse(await memoriesFile.async('string')) as Memory[]
+      : []
+    return new Bep(data, zip, reportItems, memoryItems)
   }
 
   /**
@@ -195,7 +201,6 @@ export class Bep {
    */
   private static async _initialize(data: BEP, zip: JSZip): Promise<void> {
     // Text files
-    if (!zip.file('memory.md')) zip.file('memory.md', '')
     if (!zip.file('skills/bep-authoring/SKILL.md')) zip.file('skills/bep-authoring/SKILL.md', '')
 
     // Standards content files — ensure each .md referenced in bep.json exists
