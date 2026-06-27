@@ -53,7 +53,12 @@ project.bep
 │   └── {uuid}.md
 ├── guides/
 │   └── ifc-guide.pdf
-├── memory.md                         ← collective project memory (not versioned) usually managed proactively by an LLM
+├── reports/
+│   ├── index.json                    ← report metadata array
+│   └── {uuid}.md                     ← markdown body for each report
+├── memories/
+│   ├── index.json                    ← memory metadata array (not versioned)
+│   └── {slug}.md                     ← markdown body for each memory (not versioned)
 └── skills/
     └── {skill-name}/
         ├── SKILL.md                  ← LLM behavior for this skill (not versioned)
@@ -71,7 +76,7 @@ project.bep
 - **Everything is flat with ID-based references** — no deeply nested objects. `teams` have `memberEmails: string[]`, not nested Member objects.
 - **`bep.json` always reflects the current state** (latest version). History is reconstructed by applying inverse diffs backwards.
 - BEPs are versioned as **two-number `{major}.{minor}`**.
-- There are files such as skills and memory which are LLM-first.
+- There are files such as skills and memories which are LLM-first.
 - There are schema entities, such as flags, wich are LLM-first.
 - Some data can be derived from the existing schema entities, so no need to have them explicit to avoid bloated files:
   - Naming code for any deliverable
@@ -102,7 +107,7 @@ Each example in [`core/examples/`](./core/examples) covers a specific area of th
 
 Detailed documentation for the format and schema lives in [`docs/`](./docs):
 
-- [`docs/format/`](./docs/format) — `.bep` file structure, versioning model, `memory.md`, `skills/`
+- [`docs/format/`](./docs/format) — `.bep` file structure, versioning model, `memories/`, `skills/`
 - [`docs/schema/`](./docs/schema) — all schema entities: project, participants, workflows, deliverables, etc.
 
 ---
