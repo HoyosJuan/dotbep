@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import type { BEP, NamingConvention, Project } from './types/schema.js'
+import type { BEP, NamingConvention, Project, Report } from './types/schema.js'
 import { NamingConventionSchema, ProjectSchema } from './types/schema.js'
 import { normalizeBep } from './utils/normalize.js'
 import { validateTokenValue, validateAllTokens } from './utils/naming.js'
@@ -30,6 +30,7 @@ import { Phases } from './entities/phases.js'
 import { RemoteDataEntity } from './entities/remoteData.js'
 import { Resolvers } from './entities/resolvers.js'
 import { Softwares } from './entities/softwares.js'
+import { Reports } from './entities/reports.js'
 import { Standards } from './entities/standards.js'
 import { Teams } from './entities/teams.js'
 import { Workflows } from './entities/workflows.js'
@@ -71,6 +72,7 @@ export class Bep {
   readonly remoteData: RemoteDataEntity
   readonly resolvers: Resolvers
   readonly softwares: Softwares
+  readonly reports: Reports
   readonly standards: Standards
   readonly teams: Teams
   readonly workflows: Workflows
@@ -96,6 +98,7 @@ export class Bep {
   private constructor(
     private _data: BEP,
     private _zip: JSZip,
+    reportItems: Report[] = [],
   ) {
     const bep = () => this._data
     this.project = new Singleton(
@@ -135,6 +138,7 @@ export class Bep {
     this.remoteData     = new RemoteDataEntity(bep)
     this.resolvers      = new Resolvers(bep)
     this.softwares      = new Softwares(bep, () => this.assetTypes)
+    this.reports        = new Reports(reportItems, bep, () => this._zip)
     this.standards      = new Standards(bep, () => this._zip)
     this.teams          = new Teams(bep, () => this.members)
     this.workflows      = new Workflows(bep, () => this.members, () => this.teams)
@@ -171,7 +175,11 @@ export class Bep {
     const raw = await bepJsonFile.async('string')
     const data = normalizeBep(JSON.parse(raw) as BEP)
     await Bep._initialize(data, zip)
-    return new Bep(data, zip)
+    const reportsFile = zip.file('reports/index.json')
+    const reportItems: Report[] = reportsFile
+      ? JSON.parse(await reportsFile.async('string')) as Report[]
+      : []
+    return new Bep(data, zip, reportItems)
   }
 
   /**

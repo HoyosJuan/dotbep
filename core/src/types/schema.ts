@@ -569,6 +569,18 @@ export const StandardSchema = z.object({
 
 export type Standard = z.infer<typeof StandardSchema>
 
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+export const ReportSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  date: z.iso.date(),
+  author: z.email().describe('ref Member.email'),
+}).describe('A project report authored in Markdown and stored at reports/{id}.md')
+
+export type Report = z.infer<typeof ReportSchema>
+
 // ─── LOIN ─────────────────────────────────────────────────────────────────────
 
 export const LODSchema = z.object({
