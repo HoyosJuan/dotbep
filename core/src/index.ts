@@ -153,6 +153,10 @@ export class Bep {
       bep,
       (newBep) => { this._data = newBep },
       () => this._zip,
+      (collection, items) => {
+        if (collection === 'reports') this.reports.reload(items as import('./types/schema.js').Report[])
+        else if (collection === 'memories') this.memories.reload(items as import('./types/schema.js').Memory[])
+      },
     )
     this.nomenclature = new Nomenclature(bep)
     this.skill  = new TextFile('skills/bep-authoring/SKILL.md', () => this._zip)
@@ -208,11 +212,10 @@ export class Bep {
       if (!zip.file(standard.contentPath)) zip.file(standard.contentPath, '')
     }
 
-    // Collection baselines — initialized independently of plan baseline
+    // Collection baselines — start empty so any pre-existing items surface as pending
     for (const collection of ['reports', 'memories']) {
-      const currentFile = zip.file(`${collection}/index.json`)
-      if (currentFile && !zip.file(`baseline/${collection}/index.json`)) {
-        zip.file(`baseline/${collection}/index.json`, await currentFile.async('string'))
+      if (!zip.file(`baseline/${collection}/index.json`)) {
+        zip.file(`baseline/${collection}/index.json`, '[]')
       }
     }
 

@@ -37,6 +37,10 @@ export class Memories {
     return this._items
   }
 
+  reload(items: Memory[]): void {
+    this._items = items
+  }
+
   get(ids: string[]): BulkResult<Memory> {
     const succeeded: Memory[] = []
     const failed: { id: string; error: string }[] = []

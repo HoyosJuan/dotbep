@@ -38,6 +38,10 @@ export class Reports {
     return this._items
   }
 
+  reload(items: Report[]): void {
+    this._items = items
+  }
+
   get(ids: string[]): BulkResult<Report> {
     const succeeded: Report[] = []
     const failed: { id: string; error: string }[] = []

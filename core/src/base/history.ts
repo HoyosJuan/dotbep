@@ -34,6 +34,7 @@ export class History {
     private getBep: () => BEP,
     private setBep: (bep: BEP) => void,
     private getZip: () => JSZip,
+    private reloadCollection: (collection: string, items: { id: string }[]) => void = () => {},
   ) {}
 
   // ─── Version helpers ──────────────────────────────────────────────────────
@@ -155,6 +156,7 @@ export class History {
     }
 
     zip.file(`${collection}/index.json`, baselineContent)
+    this.reloadCollection(collection, JSON.parse(baselineContent) as { id: string }[])
   }
 
   /**
