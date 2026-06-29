@@ -20,7 +20,7 @@ Concretely:
 - `baseline/memories/index.json` mirrors `memories/index.json` at the last consolidation point.
 - Any future collection added to the `.bep` root must have a corresponding entry in `baseline/` from the moment it is introduced.
 
-On every commit, `baseline/` is updated to reflect the full current state of the ZIP — plan and curated artifact collections alike.
+Plan commits update `baseline/bep.json` and `baseline/standards/` only. Curated artifact collections have their own independent consolidation: each collection's baseline is updated only when explicitly requested via `commit({ target: '<collection>' })`. A plan commit never touches collection baselines, and a collection consolidation never bumps the plan version.
 
 ## Reasoning
 
@@ -32,9 +32,10 @@ This gives the core a single, consistent mechanism for answering "what changed s
 
 ## Consequences
 
-- **Consolidation state is self-contained.** An entry in a collection is pending if its ID appears in the collection's `index.json` but not in the corresponding `baseline/` counterpart. A consumer can determine this from the file alone.
-- **New collections must opt in.** When a new collection is added to the `.bep` format, its baseline counterpart must be created on first commit and updated on every subsequent one. This is a convention enforced in the core.
-- **No change to versioning semantics.** Curated artifact collections are not versioned. The baseline entry for such a collection is not a historical snapshot — it is simply the last consolidated state, overwritten on each commit.
+- **Consolidation state is self-contained.** An entry is pending if its ID appears in a collection's `index.json` but not in the corresponding `baseline/` counterpart. A removal is pending if the opposite is true — the ID is in the baseline but no longer in the collection. A consumer can determine both from the file alone.
+- **Independent rhythms.** Plan and curated artifact collections each advance at their own pace. A plan commit does not consolidate collections; a collection consolidation does not create a plan version. The two operations are orthogonal.
+- **New collections must opt in.** When a new collection is added to the `.bep` format, its baseline counterpart must be initialised on first open and updated only via explicit consolidation. This convention is enforced in the core.
+- **No change to versioning semantics.** Curated artifact collections are not versioned. The baseline entry for such a collection is not a historical snapshot — it is the last explicitly consolidated state, overwritten only when consolidation is requested.
 
 ## Alternatives discarded
 
