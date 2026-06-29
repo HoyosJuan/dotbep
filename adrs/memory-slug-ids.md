@@ -1,4 +1,4 @@
-# ADR 001 — Memory IDs as slugs
+# ADR — Memory IDs as slugs
 
 ## Context
 

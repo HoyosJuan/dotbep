@@ -1,5 +1,11 @@
 # dot-bep — Code guide
 
+## ADRs
+
+ADRs in `core/adrs/` document decisions about the `.bep` format and the core library. They must not reference specific consumers, external systems, or layers outside of core — only the format itself and its internal constraints.
+
+At the start of every session involving core, read all files in `core/adrs/` before making any decisions or changes.
+
 ## Structure
 
 ```
