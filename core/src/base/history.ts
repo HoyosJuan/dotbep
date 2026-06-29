@@ -3,9 +3,9 @@ import type JSZip from 'jszip'
 import type { BEP, BEPVersion, Changelog, Standard } from '../types/schema.js'
 import { diffBep } from '../utils/diff.js'
 import { normalizeBep } from '../utils/normalize.js'
-import type { BepDiff, BepStatus, StandardChange, CommitParams, SquashParams } from '../types/history.js'
+import type { BepDiff, BepStatus, CollectionPending, StandardChange, CommitParams, DiscardParams, PlanCommitParams, SquashParams } from '../types/history.js'
 
-export type { BepStatus, StandardChange, CommitParams, SquashParams }
+export type { BepStatus, CollectionPending, StandardChange, CommitParams, DiscardParams, SquashParams }
 
 export type CompareResult = {
   diff: Operation[]
@@ -101,6 +101,63 @@ export class History {
   }
 
   /**
+   * Copies a curated artifact collection's index.json to baseline/ and removes
+   * any orphaned .md files — entries removed from the index since the last
+   * consolidation whose content files were kept until this commit.
+   */
+  private async snapshotBaseCollection(collection: string): Promise<void> {
+    const zip = this.getZip()
+    const file = zip.file(`${collection}/index.json`)
+    if (!file) return
+
+    const indexContent = await file.async('string')
+    const currentIds = new Set(
+      (JSON.parse(indexContent) as { id: string }[]).map(e => e.id)
+    )
+
+    // Remove every .md in the collection directory whose ID is not in the current
+    // index — covers both soft-deleted consolidated entries and entries added and
+    // removed in the same session without ever being consolidated.
+    const prefix = `${collection}/`
+    Object.keys(zip.files)
+      .filter(k => k.startsWith(prefix) && k.endsWith('.md'))
+      .forEach(k => {
+        const id = k.slice(prefix.length, -'.md'.length)
+        if (!currentIds.has(id)) zip.remove(k)
+      })
+
+    zip.file(`baseline/${collection}/index.json`, indexContent)
+  }
+
+  /**
+   * Restores a curated artifact collection's index.json from baseline/.
+   * Content files (.md) for pending adds are removed (they were created after
+   * the baseline). Content files for pending removes are still present in the
+   * zip (soft-delete) and require no action.
+   */
+  private async discardBaseCollection(collection: string): Promise<void> {
+    const zip = this.getZip()
+    const baselineFile = zip.file(`baseline/${collection}/index.json`)
+    if (!baselineFile) return
+
+    const baselineContent = await baselineFile.async('string')
+    const baselineIds = new Set(
+      (JSON.parse(baselineContent) as { id: string }[]).map(e => e.id)
+    )
+
+    const currentFile = zip.file(`${collection}/index.json`)
+    const currentIds: string[] = currentFile
+      ? (JSON.parse(await currentFile.async('string')) as { id: string }[]).map(e => e.id)
+      : []
+
+    for (const id of currentIds.filter(id => !baselineIds.has(id))) {
+      zip.remove(`${collection}/${id}.md`)
+    }
+
+    zip.file(`${collection}/index.json`, baselineContent)
+  }
+
+  /**
    * Copies each standards/{uuid}.md to baseline/standards/{id}.md so that
    * discard() can restore the .md files to their last committed state.
    */
@@ -149,7 +206,14 @@ export class History {
     return changelog?.versions ?? []
   }
 
-  async commit(params: CommitParams, force = false): Promise<BEPVersion> {
+  async commit(params: { target: 'plan' } & PlanCommitParams, force?: boolean): Promise<BEPVersion>
+  async commit(params: { target: 'reports' | 'memories' }): Promise<void>
+  async commit(params: CommitParams, force = false): Promise<BEPVersion | void> {
+    if (params.target !== 'plan') {
+      await this.snapshotBaseCollection(params.target)
+      return
+    }
+
     const zip = this.getZip()
     const currentBep = this.getBep()
     const changelog = await this.readChangelog()
@@ -164,8 +228,9 @@ export class History {
     }
 
     if (!force) {
-      const hasChanges = await this.hasPendingChanges()
-      if (!hasChanges) throw new Error('No pending changes since last commit')
+      const status = await this.status()
+      const hasPlanChanges = status.changedKeys.length > 0 || status.standards.length > 0
+      if (!hasPlanChanges) throw new Error('No pending plan changes since last commit')
     }
 
     // Bump from current version (defaults to '0.0' — the hidden terminus — on first commit,
@@ -274,27 +339,31 @@ export class History {
   }
 
   /**
-   * Resets in-memory BEP and restores .md files to the last committed baseline.
-   * Standards added since the baseline have their .md deleted.
+   * Restores the target to its last consolidated baseline.
+   *   target: 'plan'     — resets bep.json and standard .md files
+   *   target: 'reports'  — resets reports/index.json; removes .md files for pending adds
+   *   target: 'memories' — resets memories/index.json; removes .md files for pending adds
    */
-  async discard(): Promise<void> {
+  async discard(params: DiscardParams): Promise<void> {
+    if (params.target !== 'plan') {
+      await this.discardBaseCollection(params.target)
+      return
+    }
+
     const zip = this.getZip()
     const baseline = await this.readBaseline()
     if (!baseline) throw new Error('No baseline found — call commit() first')
 
     const baseIds = new Set(baseline.standards.map(s => s.id))
 
-    // Delete .md files for standards added since baseline
     for (const standard of this.getBep().standards) {
       if (!baseIds.has(standard.id)) zip.remove(standard.contentPath)
     }
 
-    // Restore .md files for standards that existed at baseline
     for (const standard of baseline.standards) {
       const baseFile = zip.file(`baseline/standards/${standard.id}.md`)
       if (!baseFile) continue
-      const content = await baseFile.async('string')
-      zip.file(standard.contentPath, content)
+      zip.file(standard.contentPath, await baseFile.async('string'))
     }
 
     this.setBep(baseline)
@@ -304,7 +373,7 @@ export class History {
    * Non-destructive revert: restores BEP state and .md files to a historical
    * version and immediately commits it as a new version.
    */
-  async revert(version: string, params: CommitParams): Promise<BEPVersion> {
+  async revert(version: string, params: PlanCommitParams): Promise<BEPVersion> {
     const zip = this.getZip()
     const historical = await this.get(version)
 
@@ -315,7 +384,7 @@ export class History {
     }
 
     this.setBep(historical)
-    return this.commit(params)
+    return this.commit({ target: 'plan', ...params }) as Promise<BEPVersion>
   }
 
   /**
@@ -325,7 +394,7 @@ export class History {
   async status(): Promise<BepStatus> {
     const zip = this.getZip()
     const baseline = await this.readBaseline()
-    if (!baseline) return { hasPendingChanges: false, project: null, sections: {}, changedKeys: [], standards: [] }
+    if (!baseline) return { hasPendingChanges: false, project: null, sections: {}, changedKeys: [], standards: [], pendingCollections: {} }
 
     const currentBep = this.getBep()
     const diff = diffBep(currentBep, baseline)
@@ -351,8 +420,25 @@ export class History {
       if (!currStdIds.has(s.id)) standards.push({ id: s.id, name: s.name, status: 'removed' })
     }
 
-    const hasPendingChanges = diff.changedKeys.length > 0 || standards.length > 0
-    return { hasPendingChanges, standards, ...diff }
+    const pendingCollections: Record<string, CollectionPending> = {}
+    for (const collection of ['reports', 'memories']) {
+      const currentFile = zip.file(`${collection}/index.json`)
+      const baselineFile = zip.file(`baseline/${collection}/index.json`)
+      const currentIds = currentFile
+        ? (JSON.parse(await currentFile.async('string')) as { id: string }[]).map(e => e.id)
+        : []
+      const baselineIds = baselineFile
+        ? (JSON.parse(await baselineFile.async('string')) as { id: string }[]).map(e => e.id)
+        : []
+      const baselineSet = new Set(baselineIds)
+      const currentSet = new Set(currentIds)
+      const added = currentIds.filter(id => !baselineSet.has(id))
+      const removed = baselineIds.filter(id => !currentSet.has(id))
+      if (added.length > 0 || removed.length > 0) pendingCollections[collection] = { added, removed }
+    }
+
+    const hasPendingChanges = diff.changedKeys.length > 0 || standards.length > 0 || Object.keys(pendingCollections).length > 0
+    return { hasPendingChanges, standards, pendingCollections, ...diff }
   }
 
   /** Shorthand — true if there are uncommitted changes since the last commit. */

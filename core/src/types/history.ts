@@ -17,16 +17,32 @@ export type StandardChange = {
   status: 'added' | 'removed' | 'modified' | 'content-modified'
 }
 
+/** Pending state for a curated artifact collection relative to its baseline. */
+export type CollectionPending = { added: string[]; removed: string[] }
+
 export type BepStatus = BepDiff & {
   hasPendingChanges: boolean
   standards: StandardChange[]
+  /** Collections with entries that differ from the baseline — only populated keys have pending changes. */
+  pendingCollections: Record<string, CollectionPending>
 }
 
 // Omit doesn't distribute over unions in TypeScript — DistributiveOmit does.
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
-/** Input params for commit — computed fields (version, date, diff) are excluded. */
-export type CommitParams = DistributiveOmit<BEPVersion, 'version' | 'date' | 'diff'>
+export type PlanCommitParams = DistributiveOmit<BEPVersion, 'version' | 'date' | 'diff'>
+
+/** Input params for commit — target discriminates between plan versioning and collection consolidation. */
+export type CommitParams =
+  | ({ target: 'plan' } & PlanCommitParams)
+  | { target: 'reports' }
+  | { target: 'memories' }
+
+/** Input params for discard — target selects what to restore to its last consolidated baseline. */
+export type DiscardParams =
+  | { target: 'plan' }
+  | { target: 'reports' }
+  | { target: 'memories' }
 
 export type SquashParams = {
   /** New terminus version — must be X.0 format and greater than current. */

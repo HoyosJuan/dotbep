@@ -208,6 +208,14 @@ export class Bep {
       if (!zip.file(standard.contentPath)) zip.file(standard.contentPath, '')
     }
 
+    // Collection baselines — initialized independently of plan baseline
+    for (const collection of ['reports', 'memories']) {
+      const currentFile = zip.file(`${collection}/index.json`)
+      if (currentFile && !zip.file(`baseline/${collection}/index.json`)) {
+        zip.file(`baseline/${collection}/index.json`, await currentFile.async('string'))
+      }
+    }
+
     // Versioning bootstrap — only if no baseline exists yet
     // baseline/bep.json is used as the sentinel: if it's present, the zip
     // was already initialized (either by a previous open() or by commit()).

@@ -21,4 +21,4 @@ export type {
   DeliverableResolved,
   NoteResolved,
 } from './resolved.js'
-export type { SectionDiff, BepDiff, BepStatus, StandardChange, CommitParams, SquashParams } from './history.js'
+export type { SectionDiff, BepDiff, BepStatus, StandardChange, CollectionPending, CommitParams, DiscardParams, SquashParams } from './history.js'

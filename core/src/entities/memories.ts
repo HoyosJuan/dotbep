@@ -101,7 +101,6 @@ export class Memories {
         continue
       }
       this._items.splice(index, 1)
-      this.getZip().remove(this._contentPath(id))
       this._flush()
       succeeded.push(id)
     }
