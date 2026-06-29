@@ -76,6 +76,22 @@ console.log('\nremove succeeded:', removed.succeeded.map(id => id.slice(0, 8) + 
 console.log('remove failed:   ', removed.failed.map(f => f.error))
 console.log('reports remaining:', bep.reports.list().map(r => r.name))
 
+// ─── Consolidation ────────────────────────────────────────────────────────────
+// Reports added since the last commit are pending: their IDs appear in
+// reports/index.json but not in baseline/reports/index.json.
+// commit({ type: 'collections' }) snapshots the collection baselines without
+// creating a new plan version.
+
+const statusBefore = await bep.history.status()
+console.log('\npending reports before consolidation:', statusBefore.pendingCollections['reports']?.added ?? [])
+// → [weeklyId] — monthlyId was removed so only the remaining one is pending
+
+await bep.history.commit({ target: 'reports' })
+
+const statusAfter = await bep.history.status()
+console.log('pending reports after consolidation: ', statusAfter.pendingCollections['reports']?.added ?? [])
+// → [] — all current reports are now in the baseline
+
 // ─── Persist — round-trip through open() ──────────────────────────────────────
 
 writeFileSync('examples/example.bep', await bep.save())

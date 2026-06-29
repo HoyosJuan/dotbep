@@ -36,6 +36,7 @@ console.log('=== history ===')
 console.log('\n--- commit v0.1 (initial) ---')
 
 const v0 = await bep.history.commit({
+  target:      'plan',
   type:        'patch',
   author:      'alice@arc.com',
   description: 'Initial BEP draft — all sections complete',
@@ -55,6 +56,7 @@ console.log('pending — standards:', st02.standards)
 // → [{ status: 'content-modified', id: stdNamingId }]
 
 const v1 = await bep.history.commit({
+  target:      'plan',
   type:        'patch',
   author:      'alice@arc.com',
   description: 'Add BIM Author role + revise naming standard',
@@ -75,6 +77,7 @@ bep.standards.setContent(stdNamingId, '# Naming Convention v4\nFinal approved ve
 bep.phases.add([{ name: 'Tender' }])
 
 const v2 = await bep.history.commit({
+  target:      'plan',
   type:        'version',
   author:      'alice@arc.com',
   description: 'First official BEP release',
@@ -90,7 +93,7 @@ bep.phases.add([{ name: 'Temporary — will be discarded' }])
 bep.standards.setContent(stdNamingId, '# WILL BE DISCARDED')
 
 console.log('hasPendingChanges before discard:', await bep.history.hasPendingChanges())
-await bep.history.discard()
+await bep.history.discard({ target: 'plan' })
 console.log('hasPendingChanges after discard: ', await bep.history.hasPendingChanges())
 
 const namingAfterDiscard = await bep.standards.getContent(stdNamingId)
@@ -122,7 +125,7 @@ const v3 = await bep.history.revert('0.1', {
   type:        'patch',
   author:      'alice@arc.com',
   description: 'Revert to initial draft',
-})
+})  // revert() internally uses target: 'plan'
 console.log('reverted as:', v3.version)  // 1.1
 
 const bimAuthorAfterRevert = bep.roles.list().find(r => r.name === 'BIM Author')

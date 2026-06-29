@@ -1,22 +1,19 @@
 // part of: node --experimental-strip-types examples/run-all.ts  (use --10 to stop here)
 //
-// Covers: flags, memories, skill.
+// Covers: flags, skill.
 //
-// These three entities are the LLM's layer of the BEP — they are written by
+// These entities are the LLM's layer of the BEP — they are written by
 // the agent, not by the BIM Manager directly.
 //
 // Flags    — observations generated after analyze_bep. Each flag points to an
 //            entity (or to the whole BEP) and carries a severity level. Flags
 //            are transient: they are cleared and regenerated on each analysis.
 //
-// Memories — LLM-generated project memories stored in memories/index.json +
-//            memories/{slug}.md inside the .bep archive. Two types: realization
-//            (institutional learning) and pattern (recurring behavior). IDs are
-//            caller-provided slugs, stable even when the display name changes.
-//
 // Skill    — instructions authored by the BIM Manager that tell the LLM how to
 //            behave in this specific BEP (terminology, tone, LOD conventions).
 //            Skill can be copied from a template BEP to seed a new project.
+//
+// Memories are covered separately in 15-memories.ts.
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { Bep } from '../dist/index.js'
@@ -61,86 +58,6 @@ const flagRemoved = bep.flags.remove([f2Id, 'ghost-flag'])
 console.log('remove info flag:', flagRemoved.succeeded)
 console.log('remove ghost (failed):', flagRemoved.failed)
 console.log('flags remaining:', bep.flags.list().length)
-
-// ─── Memories ─────────────────────────────────────────────────────────────────
-
-console.log('\n=== memories ===')
-
-// list — empty on a fresh BEP
-console.log('memories (empty):', bep.memories.list().length)
-
-// add — IDs are caller-provided slugs; content is the markdown body
-const memoriesAdded = bep.memories.add([
-  {
-    id:        'mep-coordinator-bottleneck',
-    name:      'MEP coordination delays',
-    type:      'pattern',
-    links:     [],
-    createdAt: '2026-06-01T09:00:00Z',
-    updatedAt: '2026-06-01T09:00:00Z',
-    data:      { confidence: 0.85, evidenceCount: 7 },
-    content:   'MEP coordination consistently causes delays when the responsible coordinator is absent during clash detection windows.',
-  },
-  {
-    id:        'lod-300-confirmed',
-    name:      'LOD 300 confirmed by client',
-    type:      'realization',
-    links:     ['mep-coordinator-bottleneck'],
-    createdAt: '2026-06-10T14:00:00Z',
-    updatedAt: '2026-06-10T14:00:00Z',
-    content:   'Client confirmed LOD 300 as the minimum acceptable level for structural deliverables on 2026-06-10. This closes the open question about phased LOD targets.',
-  },
-])
-console.log('memories added:', memoriesAdded.succeeded.map(m => `[${m.type}] ${m.id}`))
-console.log('add failures:', memoriesAdded.failed)
-
-// get — retrieve metadata by slug
-const fetched = bep.memories.get(['lod-300-confirmed', 'ghost-slug'])
-console.log('get succeeded:', fetched.succeeded.map(m => m.name))
-console.log('get failed:', fetched.failed)
-
-// list — now has 2
-console.log('memories count:', bep.memories.list().length)
-
-// getContent — reads the markdown body from memories/{id}.md
-const body = await bep.memories.getContent('mep-coordinator-bottleneck')
-console.log('getContent (first 60):', body.slice(0, 60))
-
-// setContent — overwrite the body without touching metadata
-bep.memories.setContent('mep-coordinator-bottleneck', body + '\n\nObserved in 7 of 12 resolved MEP clash instances.')
-const updated = await bep.memories.getContent('mep-coordinator-bottleneck')
-console.log('setContent length:', updated.length)
-
-// update — patch metadata fields; content is optional
-const updateResult = bep.memories.update([
-  {
-    id:        'mep-coordinator-bottleneck',
-    name:      'MEP coordinator absence causes delays',
-    updatedAt: '2026-06-20T10:00:00Z',
-    data:      { confidence: 0.9, evidenceCount: 10 },
-  },
-  { id: 'ghost-slug', name: 'Ghost' },
-])
-console.log('update succeeded:', updateResult.succeeded.map(m => m.name))
-console.log('update failed:', updateResult.failed)
-
-// duplicate slug — add() must reject it
-const dupResult = bep.memories.add([{
-  id:        'lod-300-confirmed',
-  name:      'Duplicate attempt',
-  type:      'realization',
-  links:     [],
-  createdAt: '2026-06-25T00:00:00Z',
-  updatedAt: '2026-06-25T00:00:00Z',
-  content:   'Should not be added.',
-}])
-console.log('duplicate add failed (expected):', dupResult.failed[0].error)
-
-// remove — deletes both index entry and memories/{id}.md
-const removeResult = bep.memories.remove(['mep-coordinator-bottleneck', 'ghost-slug'])
-console.log('remove succeeded:', removeResult.succeeded)
-console.log('remove failed:', removeResult.failed)
-console.log('memories remaining:', bep.memories.list().length)
 
 // ─── Skill ────────────────────────────────────────────────────────────────────
 

@@ -17,6 +17,7 @@ const examples = [
   '11-resolved',
   '12-history',
   '14-reports',
+  '15-memories',
 ]
 
 const untilArg = process.argv.find(a => /^--\d{2}$/.test(a))
