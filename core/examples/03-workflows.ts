@@ -143,6 +143,61 @@ const wfPatchFailed = bep.workflows.update([{
 }])
 console.log('update with ghost actionId failed:', wfPatchFailed.failed)
 
+// ─── automation node constraints ──────────────────────────────────────────────
+//
+// Verifying whether the Zod schema enforces automation → decision.
+// Test 1: automation → decision (should succeed)
+// Test 2: automation → end (should fail if the constraint is in the schema)
+
+console.log('\n=== automation → decision constraint ===')
+
+bep.events.add([{ id: 'approved', name: 'Approved' }, { id: 'rejected', name: 'Rejected' }])
+bep.automations.add([{
+  id: 'check-status',
+  name: 'Check status',
+  description: 'Verifies the current status of the asset.',
+  output: [{ key: 'result', type: 'string', required: true }],
+}])
+
+const wfAutoValid = bep.workflows.add([{
+  name: 'automation → decision (valid)',
+  diagram: {
+    direction: 'LR',
+    nodes: {
+      start:  { type: 'start' },
+      auto:   { type: 'automation', automationId: 'check-status' },
+      decide: { type: 'decision', label: 'Check result' },
+      retry:  { type: 'process', actionId: actionUpdateId, responsibleRoleIds: [roleManagerId] },
+      end:    { type: 'end' },
+    },
+    edges: {
+      e1: { from: 'start',  to: 'auto' },
+      e2: { from: 'auto',   to: 'decide', triggerEventId: 'done' },
+      e3: { from: 'decide', to: 'end',   guard: { field: 'result', operator: 'eq',  value: 'ok' } },
+      e4: { from: 'decide', to: 'retry', guard: { field: 'result', operator: 'neq', value: 'ok' } },
+      e5: { from: 'retry',  to: 'end',   triggerEventId: 'done' },
+    },
+  },
+}])
+console.log('automation → decision:', wfAutoValid.succeeded.length ? 'succeeded ✓' : 'failed ✗', wfAutoValid.failed)
+
+const wfAutoInvalid = bep.workflows.add([{
+  name: 'automation → end (should fail)',
+  diagram: {
+    direction: 'LR',
+    nodes: {
+      start: { type: 'start' },
+      auto:  { type: 'automation', automationId: 'check-status' },
+      end:   { type: 'end' },
+    },
+    edges: {
+      e1: { from: 'start', to: 'auto' },
+      e2: { from: 'auto',  to: 'end', triggerEventId: 'done' },
+    },
+  },
+}])
+console.log('automation → end:     ', wfAutoInvalid.succeeded.length ? 'succeeded (no constraint in schema)' : 'failed ✓ (constraint enforced)', wfAutoInvalid.failed)
+
 // ─── Save ─────────────────────────────────────────────────────────────────────
 
 writeFileSync('examples/example.bep', await bep.save())
