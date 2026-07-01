@@ -49,6 +49,14 @@ Before executing any file in `core/examples/`, always follow these steps in orde
 
 ---
 
+## Rule: verifying changes with examples
+
+Any change to existing code in `core/src/` — no matter how small — must be verified by running the examples (`npm run example`, following the steps in "Rule: running examples" above) before the change is considered done. Confirm every example still runs without errors.
+
+When implementing a new feature (not just modifying existing behavior), also decide and state explicitly whether it fits into an existing example (extend it to exercise the new behavior) or needs a new file under `core/examples/`. Propose which one before writing the feature's code — don't leave this as an afterthought.
+
+---
+
 ## Rule: schema changes
 
 Any modification to `core/src/types/schema.ts` requires analyzing the full impact before applying the change.
