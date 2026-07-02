@@ -21,6 +21,9 @@ describe('automation nodes — single automation', () => {
 
     const attempt = result.instance!.history.find(e => e.type === 'automationAttempt')
     expect(attempt).toMatchObject({ nodeId: 'auto1', automationId: 'first', success: true })
+    // Not `error: undefined` — the key must be absent entirely, or storage backends that
+    // reject explicit `undefined` (e.g. Firestore) throw when persisting this record.
+    expect(attempt).not.toHaveProperty('error')
   })
 
   it('a declared failure parks the instance at the automation node and records why', async () => {
@@ -57,6 +60,28 @@ describe('automation nodes — single automation', () => {
     const last = result.instance!.history.at(-1)
     expect(last).toMatchObject({ type: 'automationAttempt', success: false })
     expect((last as { error?: string }).error).toContain('kaboom')
+  })
+
+  it("a successful automation whose emitted event matches no edge is recorded, not silently dropped", async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep, {
+      automations: {
+        // The handler ran fine, but 'first' only has an edge for 'first-done' — this eventId matches nothing.
+        first: async () => ({ success: true, eventId: 'no-such-event', ok1: true }),
+      },
+    })
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    const result = await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+
+    expect(result.success).toBe(true) // the emit() call itself succeeded — the automation ran
+    expect(result.instance!.currentNodeId).toBe('auto1') // ...but nothing moved past it
+
+    const attempt = result.instance!.history.find(e => e.type === 'automationAttempt')
+    expect(attempt).toMatchObject({ nodeId: 'auto1', automationId: 'first', success: true })
+
+    const denied = result.instance!.history.at(-1)
+    expect(denied).toMatchObject({ type: 'transitionDenied', reason: 'NO_MATCHING_EDGE', actor: 'dotBEP', eventId: 'no-such-event' })
   })
 
   it('a missing handler is treated as a failure, not an unhandled exception', async () => {

@@ -18,6 +18,9 @@ describe('effects', () => {
 
     const record = result.instance!.history.find(e => e.type === 'effectExecution')
     expect(record).toMatchObject({ effectId: 'my-effect', fromEdgeId: 'e2', success: true })
+    // Not `error: undefined` — the key must be absent entirely, or storage backends that
+    // reject explicit `undefined` (e.g. Firestore) throw when persisting this record.
+    expect(record).not.toHaveProperty('error')
   })
 
   it('a thrown exception is caught, recorded as a failure, and still does not block the transition', async () => {
