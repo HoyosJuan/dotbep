@@ -25,6 +25,9 @@ import type {
   EffectExecutionRecord,
 } from './types.js'
 
+/** Plain `Omit` collapses a discriminated union to its common fields — this distributes over each member instead. */
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
+
 export interface EngineInitConfig {
   /** The runtime that accompanies the BEP — declares effects, automations, etc. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -276,7 +279,18 @@ export class Engine {
         softwareId: 'dotBEP',
         payload:    automationPayload,
       })
-      if (!autoResult.success) return current
+      if (!autoResult.success) {
+        // The automation itself succeeded, but the event it emitted didn't lead anywhere
+        // (no matching edge, invalid payload, etc.) — record that, don't drop it silently.
+        current = this._appendHistory<TransitionDeniedRecord>(current, {
+          type:   'transitionDenied',
+          reason: autoResult.error!,
+          actor:  'dotBEP',
+          eventId,
+        })
+        await this.storage.saveInstance(current)
+        return current
+      }
 
       current = autoResult.instance!
       allTransitions.push(...(autoResult.transitionsApplied ?? []))
@@ -387,9 +401,9 @@ export class Engine {
   /** Appends a new entry to `instance.history`, stamping `id` and `timestamp`. */
   private _appendHistory<E extends InstanceHistoryEntry>(
     instance: WorkflowInstance,
-    entry: Omit<E, 'id' | 'timestamp'>,
+    entry: DistributiveOmit<E, 'id' | 'timestamp'>,
   ): WorkflowInstance {
-    const full = { ...entry, id: globalThis.crypto.randomUUID(), timestamp: new Date().toISOString() } as E
+    const full = { ...entry, id: globalThis.crypto.randomUUID(), timestamp: new Date().toISOString() } as unknown as E
     return { ...instance, history: [...instance.history, full] }
   }
 
@@ -430,13 +444,10 @@ export class Engine {
       }
     }
 
-    const updated = this._appendHistory<EffectExecutionRecord>(instance, {
-      type:       'effectExecution',
-      effectId:   outcome.effectId,
-      fromEdgeId: outcome.fromEdgeId,
-      success:    outcome.success,
-      error:      outcome.error,
-    })
+    const updated = this._appendHistory<EffectExecutionRecord>(instance, outcome.success
+      ? { type: 'effectExecution', effectId: outcome.effectId, fromEdgeId: outcome.fromEdgeId, success: true }
+      : { type: 'effectExecution', effectId: outcome.effectId, fromEdgeId: outcome.fromEdgeId, success: false, error: outcome.error },
+    )
     return { instance: updated, outcome }
   }
 }

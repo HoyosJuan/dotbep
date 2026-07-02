@@ -346,7 +346,8 @@ export function getWorkflowStatus(
     }
     const attemptsSinceArrival = instance.history
       .slice(arrivalIndex + 1)
-      .filter((e): e is AutomationAttemptRecord => e.type === 'automationAttempt' && e.nodeId === instance.currentNodeId && !e.success)
+      .filter((e): e is Extract<AutomationAttemptRecord, { success: false }> =>
+        e.type === 'automationAttempt' && e.nodeId === instance.currentNodeId && !e.success)
 
     return {
       type: 'automationPending',

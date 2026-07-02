@@ -57,19 +57,16 @@ export interface TransitionRecord {
  * duplicated here, it is identical to the `trigger.payload` of the
  * `TransitionRecord` that landed on this node.
  */
-export interface AutomationAttemptRecord {
+export type AutomationAttemptRecord = {
   type: 'automationAttempt'
   id: string
   /** ref FlowNode key — the automation node this attempt ran for. */
   nodeId: string
   /** ref FlowAutomation.id */
   automationId: string
-  success: boolean
-  /** Present when success = false. */
-  error?: string
   /** ISO 8601 datetime */
   timestamp: string
-}
+} & ({ success: true } | { success: false; error: string })
 
 /**
  * Reserved for a future `revertAutomation` operation that moves an instance
@@ -97,19 +94,16 @@ export interface RevertRecord {
  * an `EffectExecutionRecord` is always also appended to `history` so the
  * outcome isn't lost once that call returns.
  */
-export interface EffectExecutionRecord {
+export type EffectExecutionRecord = {
   type: 'effectExecution'
   id: string
   /** ref FlowEffect.id */
   effectId: string
   /** ref FlowEdge key — the edge whose effect this was. */
   fromEdgeId: string
-  success: boolean
-  /** Present when success = false — no handler registered, or the handler threw. */
-  error?: string
   /** ISO 8601 datetime */
   timestamp: string
-}
+} & ({ success: true } | { success: false; error: string })
 
 /** An instance being cancelled. Does not imply the caller was authorized — that is the consumer's responsibility, not the engine's. */
 export interface CancellationRecord {
@@ -384,7 +378,7 @@ export type AutomationSuccess = { success: true; eventId: string } & Record<stri
  */
 export interface AutomationFailure {
   success: false
-  error?: string
+  error: string
 }
 
 export type AutomationResult = AutomationSuccess | AutomationFailure
@@ -411,13 +405,10 @@ export type TriggerHandler = (
   rawPayload: unknown,
 ) => Promise<{ trackedAsset: WorkflowInstance['trackedAsset']; workflowId: string }>
 
-export interface EffectOutcome {
+export type EffectOutcome = {
   effectId: string
   fromEdgeId: string
-  success: boolean
-  /** Present when success = false — no handler registered, or the handler threw. */
-  error?: string
-}
+} & ({ success: true } | { success: false; error: string })
 
 /** Public result returned by Runtime.emit(). */
 export interface EventResult {
