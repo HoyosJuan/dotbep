@@ -1,4 +1,4 @@
-import type { InstanceStore, WorkflowInstance, InstanceFilter } from './types.js'
+import type { InstanceStore, WorkflowInstance } from './types.js'
 
 /**
  * In-memory InstanceStore implementation.
@@ -8,12 +8,8 @@ import type { InstanceStore, WorkflowInstance, InstanceFilter } from './types.js
 export class MemoryStorage implements InstanceStore {
   private readonly instances = new Map<string, WorkflowInstance>()
 
-  async listInstances(filter?: InstanceFilter): Promise<WorkflowInstance[]> {
-    let results = [...this.instances.values()]
-    if (filter?.workflowId)    results = results.filter(i => i.workflowId === filter.workflowId)
-    if (filter?.status)        results = results.filter(i => i.status === filter.status)
-    if (filter?.trackedAssetId) results = results.filter(i => i.trackedAsset.source === 'internal' && i.trackedAsset.id === filter.trackedAssetId)
-    return results
+  async listInstances(): Promise<WorkflowInstance[]> {
+    return [...this.instances.values()]
   }
 
   async getInstance(instanceId: string): Promise<WorkflowInstance | null> {
