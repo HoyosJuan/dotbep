@@ -275,8 +275,8 @@ export const FlowAutomationSchema = z.object({
   payload:     z.array(FlowPayloadFieldSchema).optional()
     .describe('Fields consumed from instance context and passed to the handler.'),
   output:      z.array(FlowPayloadFieldSchema)
-    .describe('Fields the handler must return. Guards on outgoing edges reference these.'),
-}).describe('A system-executed node in a workflow. Runs a handler automatically, produces a typed output, and must be followed by a decision node that branches on that output.')
+    .describe('Fields the handler returns. Only relevant if this automation node is followed by a decision node — its guards reference these fields to branch on the output.'),
+}).describe('A system-executed node in a workflow. Runs a handler declared by the BEP runtime automatically.')
 
 export type FlowAutomation = z.infer<typeof FlowAutomationSchema>
 
@@ -447,20 +447,12 @@ export const FlowDiagramSchema = z.object({
   for (const [nodeKey, node] of nodeEntries) {
     const outs = outgoing[nodeKey] ?? []
 
-    if (node.type === 'automation') {
-      if (outs.length !== 1) {
-        ctx.addIssue({
-          code: "custom",
-          message: `automation node must have exactly one outgoing edge (found ${outs.length}).`,
-          path: ['nodes', nodeKey],
-        })
-      } else if (diagram.nodes[outs[0].toKey]?.type !== 'decision') {
-        ctx.addIssue({
-          code: "custom",
-          message: 'automation node must connect directly to a decision node.',
-          path: ['nodes', nodeKey],
-        })
-      }
+    if (node.type === 'automation' && outs.length !== 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: `automation node must have exactly one outgoing edge (found ${outs.length}).`,
+        path: ['nodes', nodeKey],
+      })
     }
 
     if (node.type === 'decision' && outs.length < 2) {
