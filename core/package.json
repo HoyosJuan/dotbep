@@ -19,7 +19,9 @@
   "scripts": {
     "build": "vite build",
     "prepublishOnly": "npm run build",
-    "example": "node --experimental-strip-types examples/run-all.ts"
+    "example": "node --experimental-strip-types examples/run-all.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "fast-json-patch": "3.1.1",
@@ -32,6 +34,7 @@
     "@types/node": "22.19.13",
     "vite": "^7.0.0",
     "vite-plugin-dts": "4.5.4",
-    "zod": "^4.0"
+    "vitest": "^4.1.9",
+    "zod": "4.4.3"
   }
 }
