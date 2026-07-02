@@ -4,7 +4,7 @@
 
 export interface BepWorkflows {
   /** Model Review — Tracks the review and approval cycle for a BIM model submitted by the team. */
-  'cde6f273-35e8-4dce-87dd-9fcdc6f60bb7': never
+  'f0155a54-0718-4d9e-ad4b-b80170a4b619': never
 }
 export type WorkflowId = keyof BepWorkflows | (string & {})
 
@@ -19,7 +19,7 @@ export interface BepEffects {
 
 export interface BepAutomations {
   /** Automatically approves the model if no blocking issues are found in the previous review cycle. */
-  'auto-approve': (payload: { threshold: number }) => { eventId: string; result: string }
+  'auto-approve': (payload: { threshold: number }) => { success: true; eventId: string; result: string } | { success: false; error?: string }
 }
 
 // ─── Resolvers ────────────────────────────────────────────────────────────────

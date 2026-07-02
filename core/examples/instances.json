@@ -1,17 +1,18 @@
 {
-  "1c938a6b-f268-4963-95b0-3137fa8d4204": {
-    "id": "1c938a6b-f268-4963-95b0-3137fa8d4204",
-    "workflowId": "cde6f273-35e8-4dce-87dd-9fcdc6f60bb7",
+  "c77abebd-eaf9-462e-9f06-6c5edb6f17de": {
+    "id": "c77abebd-eaf9-462e-9f06-6c5edb6f17de",
+    "workflowId": "f0155a54-0718-4d9e-ad4b-b80170a4b619",
     "trackedAsset": {
       "source": "internal",
       "type": "deliverable",
-      "id": "41d124ea-a046-4008-b6fe-f2fda7dbc338"
+      "id": "ab04b79e-8914-4216-99cb-fc112c727f8b"
     },
     "currentNodeId": "end",
     "status": "completed",
     "history": [
       {
-        "id": "01110d63-aa91-479a-a061-d4881c095dfb",
+        "type": "transition",
+        "id": "33219964-fd77-4462-a4e0-3cbddc0ccdf2",
         "edgeId": "e2",
         "fromNodeId": "review",
         "toNodeId": "end",
@@ -23,16 +24,24 @@
           }
         },
         "actor": "manager@demo.com",
-        "timestamp": "2026-06-17T23:05:35.325Z"
+        "timestamp": "2026-07-01T23:57:53.198Z"
+      },
+      {
+        "type": "effectExecution",
+        "effectId": "notify-reviewer",
+        "fromEdgeId": "e2",
+        "success": true,
+        "id": "04e9bf28-0e28-4b71-a2d9-e5edab11ab25",
+        "timestamp": "2026-07-01T23:57:53.198Z"
       }
     ],
-    "createdAt": "2026-06-17T23:05:35.320Z",
-    "updatedAt": "2026-06-17T23:05:35.325Z",
+    "createdAt": "2026-07-01T23:57:53.193Z",
+    "updatedAt": "2026-07-01T23:57:53.198Z",
     "initiatedBy": "manager@demo.com"
   },
-  "650a2d7e-b0f8-43bd-9f46-c97af8a44612": {
-    "id": "650a2d7e-b0f8-43bd-9f46-c97af8a44612",
-    "workflowId": "cde6f273-35e8-4dce-87dd-9fcdc6f60bb7",
+  "fd74ec66-7b90-4504-84b8-b5fe33b5f724": {
+    "id": "fd74ec66-7b90-4504-84b8-b5fe33b5f724",
+    "workflowId": "f0155a54-0718-4d9e-ad4b-b80170a4b619",
     "trackedAsset": {
       "source": "external",
       "url": "https://notion.so/page-abc123",
@@ -41,8 +50,8 @@
     "currentNodeId": "review",
     "status": "active",
     "history": [],
-    "createdAt": "2026-06-17T23:05:35.327Z",
-    "updatedAt": "2026-06-17T23:05:35.327Z",
+    "createdAt": "2026-07-01T23:57:53.201Z",
+    "updatedAt": "2026-07-01T23:57:53.201Z",
     "initiatedBy": "dotBEP"
   }
 }
