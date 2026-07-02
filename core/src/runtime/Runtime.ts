@@ -1,8 +1,8 @@
-import type { WorkflowInstance, EffectHandler, AutomationHandler, ResolverHandler, TriggerHandler, EngineRef } from './types.js'
+import type { WorkflowInstance, EffectHandler, AutomationHandler, AutomationResult, ResolverHandler, TriggerHandler, EngineRef } from './types.js'
 
 export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
-  automations: Record<string, (...args: any[]) => { eventId: string } & Record<string, unknown>>
+  automations: Record<string, (...args: any[]) => AutomationResult>
   resolvers:   Record<string, (url: string, ...args: any[]) => unknown>
   triggers:    Record<string, (rawPayload: unknown) => Promise<{ trackedAsset: WorkflowInstance['trackedAsset']; workflowId: string }>>
   env:         Record<string, string>
@@ -24,7 +24,7 @@ export interface BepTypes {
  *       await sendEmail(this.env.SENDGRID_KEY, payload.to)
  *     })
  *     this.automation('check-approval', async (instance) => {
- *       return { eventId: 'approved' }
+ *       return { success: true, eventId: 'approved' }
  *     })
  *     this.resolver('fetch-data', async (url) => {
  *       return fetch(url).then(r => r.json())

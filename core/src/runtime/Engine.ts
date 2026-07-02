@@ -1,5 +1,6 @@
 import type { BEP } from '../types/schema.js'
 import { createInstance as _createInstance, processEvent, getWorkflowStatus as _getWorkflowStatus } from './transitions.js'
+import { buildInstanceProjection, matchesQuery } from './query.js'
 import { MemoryStorage } from './MemoryStorage.js'
 import type { Runtime } from './Runtime.js'
 import type {
@@ -15,6 +16,13 @@ import type {
   LifecycleListener,
   EffectFailedListener,
   AutomationFailedListener,
+  TransitionStep,
+  InstanceHistoryEntry,
+  AutomationAttemptRecord,
+  CancellationRecord,
+  TransitionDeniedRecord,
+  AutomationResult,
+  EffectExecutionRecord,
 } from './types.js'
 
 export interface EngineInitConfig {
@@ -69,7 +77,8 @@ export class Engine {
     get(instanceId: string): Promise<WorkflowInstance | null>
     list(filter?: InstanceFilter): Promise<WorkflowInstance[]>
     delete(instanceId: string): Promise<void>
-    cancel(instanceId: string): Promise<void>
+    /** `actor` is recorded on the resulting `CancellationRecord` — the engine does not enforce who is allowed to cancel; that policy belongs to the consumer. */
+    cancel(instanceId: string, actor: string): Promise<void>
     getStatus(instanceId: string): Promise<WorkflowStatus | null>
     resolveContext(instanceId: string): Promise<Record<string, unknown>>
     onTransition(listener: TransitionListener): Engine
@@ -89,7 +98,7 @@ export class Engine {
       get:               (iId)             => this._get(iId),
       list:              (filter)          => this._list(filter),
       delete:            (iId)             => this._delete(iId),
-      cancel:            (iId)             => this._cancel(iId),
+      cancel:            (iId, actor)      => this._cancel(iId, actor),
       getStatus:         (iId)             => this._getStatus(iId),
       resolveContext:    (iId)             => this._resolveContext(iId),
       onTransition:      (l)              => { this._transitionListeners.push(l);       return this },
@@ -153,37 +162,21 @@ export class Engine {
     const bep    = this.getBep()
     const result = _createInstance(bep, workflowId, resolvedAsset, initiatedBy)
     if (!result) return null
-    const { instance, startEffects } = result
+    const { startEffects } = result
+    let instance = result.instance
     for (const ef of startEffects) {
-      await this._executeEffect(instance, ef)
+      ;({ instance } = await this._executeEffect(instance, ef))
     }
 
     const workflow  = bep.workflows.find(w => w.id === workflowId)
     const firstNode = workflow?.diagram.nodes[instance.currentNodeId]
-    let automationPending = firstNode?.type === 'automation' && firstNode.automationId
+    const pending = firstNode?.type === 'automation' && firstNode.automationId
       ? { automationId: firstNode.automationId, triggerPayload: {} as Record<string, unknown> }
       : undefined
 
-    let current = instance
-    const MAX_SERVICE_DEPTH = 10
-    let serviceDepth = 0
-
-    while (automationPending && serviceDepth++ < MAX_SERVICE_DEPTH) {
-      const { automationId, triggerPayload } = automationPending
-      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId, triggerPayload)
-      const autoResult = processEvent(bep, current, {
-        eventId,
-        actor:      'dotBEP',
-        softwareId: 'dotBEP',
-        payload:    automationPayload,
-      })
-      if (!autoResult.ok) break
-      current = autoResult.instance!
-      for (const ef of autoResult.effectsToFire ?? []) {
-        await this._executeEffect(current, ef)
-      }
-      automationPending = autoResult.automationNodePending
-    }
+    const transitions: TransitionStep[] = []
+    const effects:     EffectOutcome[]  = []
+    const current = await this._runAutomationChain(bep, instance, pending, transitions, effects)
 
     await this.storage.saveInstance(current)
     await this._fire(this._createdListeners, current)
@@ -193,11 +186,21 @@ export class Engine {
   private async _emit(instanceId: string, event: IncomingEvent): Promise<EventResult> {
     this._assertInit()
     const instance = await this.storage.getInstance(instanceId)
-    if (!instance) return { ok: false, error: 'NO_MATCHING_EDGE' }
+    if (!instance) return { success: false, error: 'NO_MATCHING_EDGE' }
 
-    const bep = this.getBep()
-    let result = processEvent(bep, instance, event, { skipRaci: this.skipRaci })
-    if (!result.ok) return { ok: false, error: result.error, payloadErrors: result.payloadErrors }
+    const bep    = this.getBep()
+    const result = processEvent(bep, instance, event, { skipRaci: this.skipRaci })
+    if (!result.success) {
+      // Record the denied attempt — it happened, even though nothing moved.
+      const denied = this._appendHistory<TransitionDeniedRecord>(instance, {
+        type:   'transitionDenied',
+        reason: result.error!,
+        actor:  event.actor,
+        eventId: event.eventId,
+      })
+      await this.storage.saveInstance(denied)
+      return { success: false, error: result.error, payloadErrors: result.payloadErrors }
+    }
 
     const allTransitions = [...(result.transitionsApplied ?? [])]
     const allEffects:     EffectOutcome[] = []
@@ -205,30 +208,12 @@ export class Engine {
     let current = result.instance!
 
     for (const ef of result.effectsToFire ?? []) {
-      allEffects.push(await this._executeEffect(current, ef))
+      const executed = await this._executeEffect(current, ef)
+      current = executed.instance
+      allEffects.push(executed.outcome)
     }
 
-    const MAX_SERVICE_DEPTH = 10
-    let serviceDepth = 0
-    while (result.automationNodePending && serviceDepth++ < MAX_SERVICE_DEPTH) {
-      const { automationId, triggerPayload } = result.automationNodePending
-      const { eventId, ...automationPayload } = await this._executeAutomationNode(current, automationId, triggerPayload)
-
-      result = processEvent(bep, current, {
-        eventId,
-        actor:      'dotBEP',
-        softwareId: 'dotBEP',
-        payload:    automationPayload,
-      })
-
-      if (!result.ok) break
-
-      current = result.instance!
-      allTransitions.push(...(result.transitionsApplied ?? []))
-      for (const ef of result.effectsToFire ?? []) {
-        allEffects.push(await this._executeEffect(current, ef))
-      }
-    }
+    current = await this._runAutomationChain(bep, current, result.automationNodePending, allTransitions, allEffects)
 
     await this.storage.saveInstance(current)
 
@@ -238,11 +223,72 @@ export class Engine {
     }
 
     return {
-      ok:                 true,
+      success:            true,
       instance:           current,
       transitionsApplied: allTransitions,
       effects:            allEffects,
     }
+  }
+
+  /**
+   * Drives an instance through zero or more automation nodes, starting from an
+   * already-computed `pending` automation (if any). Persists the instance the
+   * moment it arrives at each automation node — before running its handler —
+   * so a failed execution never erases the record of how the instance got
+   * there. Stops (without throwing) on the first failed attempt, leaving the
+   * instance parked at that automation node with the failure recorded in
+   * `history`.
+   */
+  private async _runAutomationChain(
+    bep: BEP,
+    current: WorkflowInstance,
+    pending: { automationId: string; triggerPayload: Record<string, unknown> } | undefined,
+    allTransitions: TransitionStep[],
+    allEffects: EffectOutcome[],
+  ): Promise<WorkflowInstance> {
+    const MAX_SERVICE_DEPTH = 10
+    let serviceDepth = 0
+
+    while (pending && serviceDepth++ < MAX_SERVICE_DEPTH) {
+      // Persist arrival at the automation node before executing it.
+      await this.storage.saveInstance(current)
+
+      const { automationId, triggerPayload } = pending
+      const nodeId = current.currentNodeId
+      const outcome = await this._executeAutomationNode(current, automationId, triggerPayload)
+
+      if (!outcome.success) {
+        current = this._appendHistory<AutomationAttemptRecord>(current, {
+          type: 'automationAttempt', nodeId, automationId, success: false, error: outcome.error,
+        })
+        await this.storage.saveInstance(current)
+        return current
+      }
+
+      const { success: _success, eventId, ...automationPayload } = outcome
+      current = this._appendHistory<AutomationAttemptRecord>(current, {
+        type: 'automationAttempt', nodeId, automationId, success: true,
+      })
+
+      const autoResult = processEvent(bep, current, {
+        eventId,
+        actor:      'dotBEP',
+        softwareId: 'dotBEP',
+        payload:    automationPayload,
+      })
+      if (!autoResult.success) return current
+
+      current = autoResult.instance!
+      allTransitions.push(...(autoResult.transitionsApplied ?? []))
+      for (const ef of autoResult.effectsToFire ?? []) {
+        const executed = await this._executeEffect(current, ef)
+        current = executed.instance
+        allEffects.push(executed.outcome)
+      }
+      pending = autoResult.automationNodePending
+    }
+
+    return current
   }
 
   private async _get(instanceId: string): Promise<WorkflowInstance | null> {
@@ -252,26 +298,11 @@ export class Engine {
 
   private async _list(filter?: InstanceFilter): Promise<WorkflowInstance[]> {
     this._assertInit()
-    const { pendingActionFor, ...storageFilter } = filter ?? {}
-    const instances = await this.storage.listInstances(storageFilter)
-    if (!pendingActionFor) return instances
+    const instances = await this.storage.listInstances()
+    if (!filter?.where?.length) return instances
 
-    const bep    = this.getBep()
-    const member = bep.members.find(m => m.email === pendingActionFor)
-    if (!member) return []
-
-    return instances.filter(instance => {
-      const workflow = bep.workflows.find(w => w.id === instance.workflowId)
-      if (!workflow) return false
-      const node = workflow.diagram.nodes[instance.currentNodeId]
-      if (!node) return false
-      const raciNode = node.type === 'process' ? node : null
-      const requiredRoleIds = [
-        ...(raciNode?.responsibleRoleIds ?? []),
-        ...(raciNode?.accountableRoleIds ?? []),
-      ]
-      return requiredRoleIds.length === 0 || requiredRoleIds.includes(member.roleId)
-    })
+    const bep = this.getBep()
+    return instances.filter(instance => matchesQuery(filter.where, buildInstanceProjection(bep, instance)))
   }
 
   private async _delete(instanceId: string): Promise<void> {
@@ -279,15 +310,14 @@ export class Engine {
     await this.storage.deleteInstance(instanceId)
   }
 
-  private async _cancel(instanceId: string): Promise<void> {
+  private async _cancel(instanceId: string, actor: string): Promise<void> {
     this._assertInit()
     const instance = await this.storage.getInstance(instanceId)
     if (!instance || instance.status !== 'active') return
-    const cancelled: WorkflowInstance = {
-      ...instance,
-      status:    'cancelled',
-      updatedAt: new Date().toISOString(),
-    }
+    const cancelled = this._appendHistory<CancellationRecord>(
+      { ...instance, status: 'cancelled', updatedAt: new Date().toISOString() },
+      { type: 'cancellation', actor },
+    )
     await this.storage.saveInstance(cancelled)
     await this._fire(this._cancelledListeners, cancelled)
   }
@@ -306,6 +336,7 @@ export class Engine {
     if (!instance) return {}
     const result: Record<string, unknown> = {}
     for (const event of instance.history) {
+      if (event.type !== 'transition') continue
       Object.assign(result, event.trigger.payload ?? {})
     }
     return result
@@ -326,42 +357,86 @@ export class Engine {
     await Promise.allSettled(listeners.map(fn => fn(...args)))
   }
 
+  /**
+   * Executes an automation handler and always resolves — never throws. A
+   * missing handler, a declared `{ success: false }`, and an uncaught
+   * exception are all normalized to the same `AutomationFailure` result, so
+   * the caller has a single path to handle regardless of how the handler
+   * failed.
+   */
   private async _executeAutomationNode(
     instance: WorkflowInstance,
     automationId: string,
     triggerPayload: Record<string, unknown>,
-  ): Promise<{ eventId: string } & Record<string, unknown>> {
+  ): Promise<AutomationResult> {
     const handler = this._runtime.automations[automationId]
-    if (!handler) throw new Error(`No handler declared for automation "${automationId}"`)
+    if (!handler) {
+      const error = `No handler declared for automation "${automationId}"`
+      await this._fire(this._automationFailedListeners, instance, automationId, error)
+      return { success: false, error }
+    }
     try {
       return await handler(instance, triggerPayload)
     } catch (error) {
-      await this._fire(this._automationFailedListeners, instance, automationId, serializeError(error))
-      throw error
+      const message = serializeError(error)
+      await this._fire(this._automationFailedListeners, instance, automationId, message)
+      return { success: false, error: message }
     }
   }
 
+  /** Appends a new entry to `instance.history`, stamping `id` and `timestamp`. */
+  private _appendHistory<E extends InstanceHistoryEntry>(
+    instance: WorkflowInstance,
+    entry: Omit<E, 'id' | 'timestamp'>,
+  ): WorkflowInstance {
+    const full = { ...entry, id: globalThis.crypto.randomUUID(), timestamp: new Date().toISOString() } as E
+    return { ...instance, history: [...instance.history, full] }
+  }
+
+  /**
+   * Executes an effect handler (fire-and-forget — never gates progress) and
+   * records the outcome both as the return value (for the immediate caller,
+   * e.g. `TransitionListener`) and as an `EffectExecutionRecord` appended to
+   * `instance.history`, so a fire-and-forget effect leaves a durable trace
+   * instead of vanishing once the `emit()`/`create()` call returns.
+   */
   private async _executeEffect(
     instance: WorkflowInstance,
     ef: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> },
-  ): Promise<EffectOutcome> {
+  ): Promise<{ instance: WorkflowInstance; outcome: EffectOutcome }> {
     const handler = this._runtime.effects[ef.effectId]
-    if (!handler) {
-      return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'skipped' }
-    }
 
-    try {
-      await handler(instance, ef.triggerPayload)
-      return { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, status: 'executed' }
-    } catch (error) {
-      const outcome: EffectOutcome = {
-        effectId:    ef.effectId,
-        fromEdgeId:  ef.fromEdgeId,
-        status:      'failed',
-        error:       serializeError(error),
+    let outcome: EffectOutcome
+    if (!handler) {
+      outcome = {
+        effectId:   ef.effectId,
+        fromEdgeId: ef.fromEdgeId,
+        success:    false,
+        error:      `No handler registered for effect "${ef.effectId}"`,
       }
       await this._fire(this._effectFailedListeners, instance, outcome)
-      return outcome
+    } else {
+      try {
+        await handler(instance, ef.triggerPayload)
+        outcome = { effectId: ef.effectId, fromEdgeId: ef.fromEdgeId, success: true }
+      } catch (error) {
+        outcome = {
+          effectId:   ef.effectId,
+          fromEdgeId: ef.fromEdgeId,
+          success:    false,
+          error:      serializeError(error),
+        }
+        await this._fire(this._effectFailedListeners, instance, outcome)
+      }
     }
+
+    const updated = this._appendHistory<EffectExecutionRecord>(instance, {
+      type:       'effectExecution',
+      effectId:   outcome.effectId,
+      fromEdgeId: outcome.fromEdgeId,
+      success:    outcome.success,
+      error:      outcome.error,
+    })
+    return { instance: updated, outcome }
   }
 }

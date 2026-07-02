@@ -4,13 +4,13 @@
 import type { BEP, FlowEdge, EdgeGuard } from '../types/schema.js'
 import type {
   IncomingEvent,
-  TransitionEvent,
+  TransitionRecord,
   WorkflowInstance,
   InstanceStatus,
   WorkflowStatus,
-  RoleRef,
-  TeamRef,
-  RaciLevel,
+  AwaitingActionStatus,
+  AutomationAttemptRecord,
+  InstanceQueryRaciLevel,
   ProcessEventError,
   TransitionStep,
   PayloadFieldError,
@@ -21,28 +21,42 @@ const MAX_DECISION_DEPTH = 10
 
 // ─── Guard evaluation ─────────────────────────────────────────────────────────
 
-/** Evaluates a guard condition against an event payload. Pure. */
-export function evaluateGuard(guard: EdgeGuard, payload: Record<string, unknown>): boolean {
-  const val = payload[guard.field]
-  switch (guard.operator) {
+/**
+ * Applies a single field/operator/value comparison. Pure, and shared between
+ * `evaluateGuard` (edge guards, evaluated against a flat event payload) and
+ * the instance query engine (`query.ts`, evaluated against a nested,
+ * BEP-resolved projection) — same operator vocabulary, different contexts.
+ */
+export function applyOperator(operator: string, val: unknown, expected: unknown): boolean {
+  switch (operator) {
     case 'exists':   return val !== undefined && val !== null
-    case 'eq':       return val === guard.value
-    case 'neq':      return val !== guard.value
-    case 'gt':       return typeof val === 'number' && typeof guard.value === 'number' && val > guard.value
-    case 'lt':       return typeof val === 'number' && typeof guard.value === 'number' && val < guard.value
+    case 'eq':       return val === expected
+    case 'neq':      return val !== expected
+    case 'gt':       return typeof val === 'number' && typeof expected === 'number' && val > expected
+    case 'lt':       return typeof val === 'number' && typeof expected === 'number' && val < expected
     case 'contains':
-      if (typeof val === 'string' && typeof guard.value === 'string') return val.includes(guard.value)
-      if (Array.isArray(val)) return (val as unknown[]).includes(guard.value)
+      if (typeof val === 'string' && typeof expected === 'string') return val.includes(expected)
+      if (Array.isArray(val)) return (val as unknown[]).includes(expected)
       return false
     default:         return false
   }
 }
 
+/** Evaluates a guard condition against an event payload. Pure. */
+export function evaluateGuard(guard: EdgeGuard, payload: Record<string, unknown>): boolean {
+  return applyOperator(guard.operator, payload[guard.field], guard.value)
+}
+
 // ─── Authorization ────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the actor satisfies the R or A constraints of a process node.
- * If no R or A is defined, the node is open to anyone.
+ * Returns true if the actor is authorized to act on a process node.
+ *
+ * Responsible has priority over accountable: if the node declares a
+ * responsible party (role, team, or email), only that assignment is checked
+ * — accountable is not a second way in, even if the actor happens to match
+ * it. Accountable is only consulted as a fallback when the node declares no
+ * responsible at all. If neither is declared, the node is open to anyone.
  */
 function isActorAuthorized(bep: BEP, nodeId: string, workflowId: string, actorEmail: string): boolean {
   const workflow = bep.workflows.find(w => w.id === workflowId)
@@ -68,10 +82,9 @@ function isActorAuthorized(bep: BEP, nodeId: string, workflowId: string, actorEm
     return false
   }
 
-  return (
-    (hasResponsible && matches(node.responsibleRoleIds, node.responsibleTeamIds, node.responsibleEmails)) ||
-    (hasAccountable && matches(node.accountableRoleIds, node.accountableTeamIds, node.accountableEmails))
-  )
+  return hasResponsible
+    ? matches(node.responsibleRoleIds, node.responsibleTeamIds, node.responsibleEmails)
+    : matches(node.accountableRoleIds, node.accountableTeamIds, node.accountableEmails)
 }
 
 // ─── Payload validation ───────────────────────────────────────────────────────
@@ -129,8 +142,8 @@ function edgeMatchesEvent(edge: FlowEdge, event: IncomingEvent): boolean {
 
 /** Internal result of processEvent — used by Engine to build EventResult. */
 export interface ProcessEventResult {
-  ok: boolean
-  /** Updated instance. Present when ok = true. */
+  success: boolean
+  /** Updated instance. Present when success = true. */
   instance?: WorkflowInstance
   /** Ordered list of transitions applied (may include decision auto-traversals). */
   transitionsApplied?: TransitionStep[]
@@ -208,21 +221,21 @@ export function processEvent(
   options?: { skipRaci?: boolean },
 ): ProcessEventResult {
   if (instance.status !== 'active') {
-    return { ok: false, error: 'INSTANCE_NOT_ACTIVE' }
+    return { success: false, error: 'INSTANCE_NOT_ACTIVE' }
   }
 
   if (!options?.skipRaci && !isActorAuthorized(bep, instance.currentNodeId, instance.workflowId, event.actor)) {
-    return { ok: false, error: 'UNAUTHORIZED' }
+    return { success: false, error: 'UNAUTHORIZED' }
   }
 
   const workflow = bep.workflows.find(w => w.id === instance.workflowId)
-  if (!workflow) return { ok: false, error: 'NO_MATCHING_EDGE' }
+  if (!workflow) return { success: false, error: 'NO_MATCHING_EDGE' }
 
   const { nodes, edges } = workflow.diagram
 
   // Working state — assembled immutably into the final instance at the end.
   let currentNodeId = instance.currentNodeId
-  const newHistory: TransitionEvent[] = []
+  const newHistory: TransitionRecord[] = []
   const effectsToFire: { effectId: string; fromEdgeId: string; triggerPayload: Record<string, unknown> }[] = []
   const transitionsApplied: TransitionStep[] = []
 
@@ -232,17 +245,17 @@ export function processEvent(
     ([, e]) => e.from === currentNodeId && edgeMatchesEvent(e, event),
   )
 
-  if (candidates.length === 0) return { ok: false, error: 'NO_MATCHING_EDGE' }
-  if (candidates.length > 1)   return { ok: false, error: 'AMBIGUOUS_TRANSITION' }
+  if (candidates.length === 0) return { success: false, error: 'NO_MATCHING_EDGE' }
+  if (candidates.length > 1)   return { success: false, error: 'AMBIGUOUS_TRANSITION' }
 
   const [edgeId, edge] = candidates[0]!
 
   if ('triggerEventId' in edge) {
     const payloadErrors = validatePayload(bep, edge.triggerEventId, event.payload)
-    if (payloadErrors.length > 0) return { ok: false, error: 'INVALID_PAYLOAD', payloadErrors }
+    if (payloadErrors.length > 0) return { success: false, error: 'INVALID_PAYLOAD', payloadErrors }
   }
 
-  newHistory.push(buildTransitionEvent(edgeId, currentNodeId, edge.to, event))
+  newHistory.push(buildTransitionRecord(edgeId, currentNodeId, edge.to, event))
   effectsToFire.push(...(edge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: edgeId, triggerPayload: event.payload ?? {} })))
   transitionsApplied.push({ edgeId, fromNodeId: currentNodeId, toNodeId: edge.to })
   currentNodeId = edge.to
@@ -255,7 +268,7 @@ export function processEvent(
 
   let depth = 0
   while (nodes[currentNodeId]?.type === 'decision') {
-    if (++depth > MAX_DECISION_DEPTH) return { ok: false, error: 'DECISION_LOOP' }
+    if (++depth > MAX_DECISION_DEPTH) return { success: false, error: 'DECISION_LOOP' }
 
     const outgoing = Object.entries(edges).filter(([, e]) => {
       if (e.from !== currentNodeId) return false
@@ -269,7 +282,7 @@ export function processEvent(
     // Take first matching branch — guards are expected to be mutually exclusive.
     const [decEdgeId, decEdge] = outgoing[0]!
 
-    newHistory.push(buildTransitionEvent(decEdgeId, currentNodeId, decEdge.to, event, true))
+    newHistory.push(buildTransitionRecord(decEdgeId, currentNodeId, decEdge.to, event, true))
     effectsToFire.push(...(decEdge.effectIds ?? []).map(effectId => ({ effectId, fromEdgeId: decEdgeId, triggerPayload: event.payload ?? {} })))
     transitionsApplied.push({ edgeId: decEdgeId, fromNodeId: currentNodeId, toNodeId: decEdge.to })
     currentNodeId = decEdge.to
@@ -292,44 +305,66 @@ export function processEvent(
     ? { nodeId: currentNodeId, automationId: finalNode.automationId, triggerPayload: event.payload ?? {} }
     : undefined
 
-  return { ok: true, instance: updatedInstance, transitionsApplied, effectsToFire, automationNodePending }
+  return { success: true, instance: updatedInstance, transitionsApplied, effectsToFire, automationNodePending }
 }
 
 // ─── Workflow status ──────────────────────────────────────────────────────────
 
 /**
- * Returns the current state of a workflow instance: active node, all outgoing
- * transitions, and resolved RACI. Actor-independent — authorization is enforced
- * at emit() time, not here.
+ * Returns the current state of a workflow instance as one of a handful of
+ * meaningful variants (awaiting a human, waiting on an automation, stranded
+ * on a decision node, completed, cancelled) — see `WorkflowStatus`.
+ * Actor-independent — authorization is enforced at emit() time, not here.
+ * Deliberately thin: ids the caller can resolve themselves against the BEP
+ * (role/team names, action/workflow details) are not duplicated here.
  */
 export function getWorkflowStatus(
   bep: BEP,
   instance: WorkflowInstance,
 ): WorkflowStatus {
+  const base = {
+    instanceId:    instance.id,
+    workflowId:    instance.workflowId,
+    trackedAsset:  instance.trackedAsset,
+    currentNodeId: instance.currentNodeId,
+  }
+
+  if (instance.status === 'completed') return { type: 'completed', ...base }
+  if (instance.status === 'cancelled') return { type: 'cancelled', ...base }
+
   const workflow = bep.workflows.find(w => w.id === instance.workflowId)!
   const { nodes, edges } = workflow.diagram
   const currentNode = nodes[instance.currentNodeId]!
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  if (currentNode.type === 'automation') {
+    // Every entry since the transition that landed here — a success would have
+    // already moved currentNodeId away, so anything found is a failed attempt.
+    let arrivalIndex = -1
+    for (let i = instance.history.length - 1; i >= 0; i--) {
+      const entry = instance.history[i]!
+      if (entry.type === 'transition' && entry.toNodeId === instance.currentNodeId) { arrivalIndex = i; break }
+    }
+    const attemptsSinceArrival = instance.history
+      .slice(arrivalIndex + 1)
+      .filter((e): e is AutomationAttemptRecord => e.type === 'automationAttempt' && e.nodeId === instance.currentNodeId && !e.success)
 
-  const resolveRoles = (ids?: string[]): RoleRef[] =>
-    (ids ?? []).flatMap(id => {
-      const role = bep.roles.find(r => r.id === id)
-      return role ? [{ id: role.id, name: role.name }] : []
-    })
+    return {
+      type: 'automationPending',
+      ...base,
+      automation: {
+        id: currentNode.automationId,
+        failedAttemptsSinceArrival: attemptsSinceArrival.length,
+        lastError: attemptsSinceArrival.at(-1)?.error,
+      },
+    }
+  }
 
-  const resolveTeams = (ids?: string[]): TeamRef[] =>
-    (ids ?? []).flatMap(id => {
-      const team = bep.teams.find(t => t.id === id)
-      return team ? [{ id: team.id, name: team.name }] : []
-    })
+  if (currentNode.type === 'decision') return { type: 'stranded', ...base }
 
-  const buildRaciLevel = (
-    roleIds?: string[], teamIds?: string[], emails?: string[],
-  ): RaciLevel => ({
-    roles:  resolveRoles(roleIds),
-    teams:  resolveTeams(teamIds),
-    emails: emails ?? [],
+  if (currentNode.type !== 'process') return { type: 'stranded', ...base } // 'start'/'end' while active — shouldn't happen
+
+  const raciLevel = (roleIds?: string[], teamIds?: string[], emails?: string[]): InstanceQueryRaciLevel => ({
+    roleIds: roleIds ?? [], teamIds: teamIds ?? [], emails: emails ?? [],
   })
 
   const resolvePayload = (eventId: string) =>
@@ -340,50 +375,38 @@ export function getWorkflowStatus(
       label:    p.label,
     }))
 
-  const raciNode = currentNode.type === 'process' ? currentNode : null
-
-  const transitions: WorkflowStatus['transitions'] = []
-
+  const transitions: AwaitingActionStatus['transitions'] = []
   for (const [edgeId, edge] of Object.entries(edges)) {
     if (edge.from !== instance.currentNodeId) continue
     if (!('triggerEventId' in edge)) continue
     const eventId = edge.triggerEventId
-    transitions.push({
-      edgeId,
-      label:           edge.label ?? eventId,
-      emits:           eventId,
-      requiredPayload: resolvePayload(eventId),
-    })
+    transitions.push({ edgeId, emits: eventId, label: edge.label, requiredPayload: resolvePayload(eventId) })
   }
 
   return {
-    currentNode: {
-      id:    instance.currentNodeId,
-      type:  currentNode.type,
-      label: instance.currentNodeId,
-    },
-    status: instance.status,
+    type: 'awaitingAction',
+    ...base,
     transitions,
     raci: {
-      responsible: buildRaciLevel(raciNode?.responsibleRoleIds, raciNode?.responsibleTeamIds, raciNode?.responsibleEmails),
-      accountable:  buildRaciLevel(raciNode?.accountableRoleIds, raciNode?.accountableTeamIds, raciNode?.accountableEmails),
-      consulted:    buildRaciLevel(raciNode?.consultedRoleIds,   raciNode?.consultedTeamIds,   raciNode?.consultedEmails),
-      informed:     buildRaciLevel(raciNode?.informedRoleIds,    raciNode?.informedTeamIds,    raciNode?.informedEmails),
+      responsible: raciLevel(currentNode.responsibleRoleIds, currentNode.responsibleTeamIds, currentNode.responsibleEmails),
+      accountable: raciLevel(currentNode.accountableRoleIds, currentNode.accountableTeamIds, currentNode.accountableEmails),
+      consulted:   raciLevel(currentNode.consultedRoleIds,   currentNode.consultedTeamIds,   currentNode.consultedEmails),
+      informed:    raciLevel(currentNode.informedRoleIds,    currentNode.informedTeamIds,    currentNode.informedEmails),
     },
-    isTerminal: currentNode.type === 'end',
   }
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-function buildTransitionEvent(
+function buildTransitionRecord(
   edgeId: string,
   fromNodeId: string,
   toNodeId: string,
   trigger: IncomingEvent,
   auto?: boolean,
-): TransitionEvent {
+): TransitionRecord {
   return {
+    type:      'transition',
     id:        globalThis.crypto.randomUUID(),
     edgeId,
     fromNodeId,

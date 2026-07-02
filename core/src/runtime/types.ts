@@ -20,10 +20,17 @@ export interface IncomingEvent {
   payload?: Record<string, unknown>
 }
 
-// ─── Transition log ───────────────────────────────────────────────────────────
+// ─── Instance history ─────────────────────────────────────────────────────────
+//
+// `WorkflowInstance.history` is an ordered log of everything that happened to
+// an instance, not only successful transitions. Each entry is discriminated by
+// `type` — narrow on it before reading fields specific to one variant (e.g.
+// `resolveContext` only folds `trigger.payload` from `TransitionRecord`
+// entries, never from the others).
 
-/** Immutable log entry written after each successful transition. */
-export interface TransitionEvent {
+/** A successful transition from one node to another. */
+export interface TransitionRecord {
+  type: 'transition'
   id: string
   /** ref FlowEdge key */
   edgeId: string
@@ -44,6 +51,98 @@ export interface TransitionEvent {
   notes?: string
 }
 
+/**
+ * One execution attempt of an automation node's handler. Written for every
+ * attempt, success or failure — the payload passed to the handler is not
+ * duplicated here, it is identical to the `trigger.payload` of the
+ * `TransitionRecord` that landed on this node.
+ */
+export interface AutomationAttemptRecord {
+  type: 'automationAttempt'
+  id: string
+  /** ref FlowNode key — the automation node this attempt ran for. */
+  nodeId: string
+  /** ref FlowAutomation.id */
+  automationId: string
+  success: boolean
+  /** Present when success = false. */
+  error?: string
+  /** ISO 8601 datetime */
+  timestamp: string
+}
+
+/**
+ * Reserved for a future `revertAutomation` operation that moves an instance
+ * back from a failed automation node to the process node that fed it —
+ * only ever available when that predecessor is resolvable from `history` for
+ * this specific instance. Not produced by the engine yet.
+ */
+export interface RevertRecord {
+  type: 'automationRevert'
+  id: string
+  /** The automation node being left. */
+  fromNodeId: string
+  /** The process node being returned to. */
+  toNodeId: string
+  /** Member.email */
+  actor: string
+  /** ISO 8601 datetime */
+  timestamp: string
+}
+
+/**
+ * Durable record of a fire-and-forget effect's outcome. `EffectOutcome`
+ * itself is still returned from `emit()`/`create()` and passed to
+ * `TransitionListener`/`EffectFailedListener` for immediate consumption, but
+ * an `EffectExecutionRecord` is always also appended to `history` so the
+ * outcome isn't lost once that call returns.
+ */
+export interface EffectExecutionRecord {
+  type: 'effectExecution'
+  id: string
+  /** ref FlowEffect.id */
+  effectId: string
+  /** ref FlowEdge key — the edge whose effect this was. */
+  fromEdgeId: string
+  success: boolean
+  /** Present when success = false — no handler registered, or the handler threw. */
+  error?: string
+  /** ISO 8601 datetime */
+  timestamp: string
+}
+
+/** An instance being cancelled. Does not imply the caller was authorized — that is the consumer's responsibility, not the engine's. */
+export interface CancellationRecord {
+  type: 'cancellation'
+  id: string
+  /** Member.email */
+  actor: string
+  reason?: string
+  /** ISO 8601 datetime */
+  timestamp: string
+}
+
+/** An attempted transition that the engine refused — no node change occurred. */
+export interface TransitionDeniedRecord {
+  type: 'transitionDenied'
+  id: string
+  reason: ProcessEventError
+  /** Member.email */
+  actor: string
+  /** ref FlowEvent.id — the event that was rejected. */
+  eventId: string
+  /** ISO 8601 datetime */
+  timestamp: string
+}
+
+export type InstanceHistoryEntry =
+  | TransitionRecord
+  | AutomationAttemptRecord
+  | RevertRecord
+  | EffectExecutionRecord
+  | CancellationRecord
+  | TransitionDeniedRecord
+
 // ─── Workflow instance ────────────────────────────────────────────────────────
 
 export interface WorkflowInstance {
@@ -59,8 +158,8 @@ export interface WorkflowInstance {
   /** Key of the current FlowNode. Not a decision node — engine auto-traverses those. */
   currentNodeId: string
   status: InstanceStatus
-  /** Ordered log of all transitions, oldest first. */
-  history: TransitionEvent[]
+  /** Ordered log of everything that happened to this instance, oldest first. */
+  history: InstanceHistoryEntry[]
 
   /** Set when this instance was spawned by a parent instance. */
   parentInstanceId?: string
@@ -75,73 +174,148 @@ export interface WorkflowInstance {
   initiatedBy: string
 }
 
-// ─── Instance filter ──────────────────────────────────────────────────────────
+// ─── Instance queries ─────────────────────────────────────────────────────────
+//
+// A small query engine for filtering workflow instances, reusing the same
+// field/operator/value vocabulary as `EdgeGuard` (see `applyOperator` in
+// transitions.ts) so it reads consistently with the rest of the runtime.
+// Conditions are evaluated against an `InstanceQueryProjection`, not the raw
+// `WorkflowInstance` — the projection also exposes fields resolved from the
+// BEP (the current node's RACI, the workflow's name) that don't live on the
+// instance itself.
+
+export type InstanceQueryOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'contains' | 'exists'
+
+export interface InstanceQueryCondition {
+  /** Dot-path into InstanceQueryProjection, e.g. 'status', 'trackedAsset.source', 'raci.responsible.teamIds', 'workflow.name'. */
+  field: string
+  operator: InstanceQueryOperator
+  value?: unknown
+}
+
+/** A single condition, or a nested `and`/`or` group of them. */
+export type InstanceQuery =
+  | InstanceQueryCondition
+  | { and: InstanceQuery[] }
+  | { or: InstanceQuery[] }
 
 export interface InstanceFilter {
-  /** ref Workflow.id */
-  workflowId?: string
-  status?: InstanceStatus
-  /** Member.email — returns instances where this actor has a pending RACI action. */
-  pendingActionFor?: string
-  /** ref internal asset id (e.g. Deliverable.id) — only matches source: 'internal' instances. */
-  trackedAssetId?: string
+  /** The top-level array is an implicit AND — equivalent to wrapping it in `{ and: [...] }`. */
+  where?: InstanceQuery[]
 }
 
-// ─── Node config ──────────────────────────────────────────────────────────────
-
-/** Role reference with minimal resolved fields. */
-export interface RoleRef {
-  id: string
-  name: string
-}
-
-/** Team reference with minimal resolved fields. */
-export interface TeamRef {
-  id: string
-  name: string
-}
-
-/**
- * Resolved RACI assignment for one letter (R/A/C/I) at a node.
- * Three levels of specificity: emails > teams+roles > roles.
- */
-export interface RaciLevel {
-  roles:   RoleRef[]
-  teams:   TeamRef[]
-  /** Explicit member emails authorized regardless of role or team. */
+/** One side (responsible or accountable) of a resolved RACI assignment, ready to query. */
+export interface InstanceQueryRaciLevel {
+  roleIds: string[]
+  teamIds: string[]
   emails:  string[]
 }
 
-/** Current state of a workflow instance — node, transitions, and RACI. Actor-independent. */
-export interface WorkflowStatus {
-  currentNode: {
-    id: string
-    type: string
-    label: string
-  }
-
+/**
+ * Per-instance queryable view. Some fields are copied straight from
+ * `WorkflowInstance`; others (`workflow`, `raci`) are resolved from the BEP
+ * for that instance's current position in its workflow and don't exist on
+ * `WorkflowInstance` itself.
+ */
+export interface InstanceQueryProjection {
+  id: string
+  workflowId: string
   status: InstanceStatus
+  currentNodeId: string
+  initiatedBy: string
+  createdAt: string
+  updatedAt: string
+  trackedAsset: WorkflowInstance['trackedAsset']
+  /** Absent if the instance's workflow can no longer be found in the BEP. */
+  workflow?: { id: string; name: string }
+  raci: {
+    responsible: InstanceQueryRaciLevel
+    accountable: InstanceQueryRaciLevel
+    /** True if the current node declares at least one responsible role, team, or email. */
+    hasResponsible: boolean
+    /** True if the current node declares at least one accountable role, team, or email. */
+    hasAccountable: boolean
+  }
+}
 
-  /** All transitions available from the current node. Authorization is enforced at emit() time. */
+// ─── Workflow status ──────────────────────────────────────────────────────────
+//
+// A discriminated union, one variant per meaningful state an instance can be
+// in — not a flat object with fields that are silently irrelevant depending
+// on where the instance happens to be. Deliberately thin: fields the
+// consumer could resolve themselves from the BEP given an id (role/team
+// names, action details, workflow name) are left as raw ids, not duplicated
+// here. Only computed facts that require the engine's own logic (RACI
+// resolution, scanning `history` for automation attempts) are included.
+
+interface WorkflowStatusBase {
+  instanceId: string
+  /** ref Workflow.id */
+  workflowId: string
+  trackedAsset: WorkflowInstance['trackedAsset']
+  /** ref FlowNode key */
+  currentNodeId: string
+}
+
+/** Parked at a process node — a human action is pending. */
+export interface AwaitingActionStatus extends WorkflowStatusBase {
+  type: 'awaitingAction'
+  /** Transitions available from here. Authorization is enforced at emit() time, not reflected here. */
   transitions: {
     edgeId: string
-    label: string
     /** eventId to emit */
     emits: string
+    label?: string
     requiredPayload: { key: string; type: string; required: boolean; label?: string }[]
   }[]
-
-  /** RACI assignment for the current node — resolved to roles, teams and emails. */
   raci: {
-    responsible: RaciLevel
-    accountable:  RaciLevel
-    consulted:    RaciLevel
-    informed:     RaciLevel
+    responsible: InstanceQueryRaciLevel
+    accountable: InstanceQueryRaciLevel
+    consulted:   InstanceQueryRaciLevel
+    informed:    InstanceQueryRaciLevel
   }
-
-  /** True if the current node is type "end". */
-  isTerminal: boolean
 }
+
+/** Parked at an automation node. May be executing, or stuck after one or more failed attempts. */
+export interface AutomationPendingStatus extends WorkflowStatusBase {
+  type: 'automationPending'
+  automation: {
+    /** ref FlowAutomation.id */
+    id: string
+    /** Failed attempts recorded since the instance arrived at this node — 0 if none yet. */
+    failedAttemptsSinceArrival: number
+    /** The most recent failure's error message, if any attempt has failed. */
+    lastError?: string
+  }
+}
+
+/**
+ * Parked at a decision node — not a valid resting state. Decision nodes are
+ * always auto-traversed within a single `processEvent` call; landing here
+ * means no outgoing guard matched the triggering event's payload (see
+ * `project_decision_node_silent_stranding`). Surfaced explicitly so a
+ * consumer can tell this apart from "nothing pending" instead of it looking
+ * like a quiet, valid state.
+ */
+export interface StrandedStatus extends WorkflowStatusBase {
+  type: 'stranded'
+}
+
+export interface CompletedStatus extends WorkflowStatusBase {
+  type: 'completed'
+}
+
+export interface CancelledStatus extends WorkflowStatusBase {
+  type: 'cancelled'
+}
+
+/** Current state of a workflow instance. Actor-independent. */
+export type WorkflowStatus =
+  | AwaitingActionStatus
+  | AutomationPendingStatus
+  | StrandedStatus
+  | CompletedStatus
+  | CancelledStatus
 
 /** Minimal engine reference available to runtime handlers via this.engine. */
 export interface EngineRef {
@@ -195,15 +369,38 @@ export type ResolverHandler = (
 ) => Promise<unknown>
 
 /**
+ * Successful outcome of an automation handler — eventId must match the
+ * FlowEvent declared on the node's outgoing edge, plus any additional payload
+ * fields used by guards further down the diagram.
+ */
+export type AutomationSuccess = { success: true; eventId: string } & Record<string, unknown>
+
+/**
+ * Declared technical failure of an automation handler — a caught error the
+ * handler chose to report, not a business-logic outcome. The engine treats
+ * this identically to an uncaught exception thrown by the handler: both leave
+ * the instance parked at the automation node with an `AutomationAttemptRecord`
+ * describing the failure, never silently.
+ */
+export interface AutomationFailure {
+  success: false
+  error?: string
+}
+
+export type AutomationResult = AutomationSuccess | AutomationFailure
+
+/**
  * Handler for an automation node. Receives the instance and the payload filtered
- * from instance.context according to FlowAutomation.payload. Must return an object
- * with an eventId matching the FlowEvent declared on the outgoing edge, plus any
- * additional payload fields used by guards.
+ * from instance.context according to FlowAutomation.payload. Must resolve to an
+ * `AutomationResult` — either `{ success: true, eventId, ...payload }` to
+ * advance, matching the FlowEvent on the node's outgoing edge, or
+ * `{ success: false, error? }` to report a technical failure. Throwing is
+ * also supported and handled the same way as returning `success: false`.
  */
 export type AutomationHandler = (
   instance: WorkflowInstance,
   payload:  Record<string, unknown>,
-) => Promise<{ eventId: string } & Record<string, unknown>>
+) => Promise<AutomationResult>
 
 /**
  * Handler registered for a specific software trigger (keyed by Software.id).
@@ -217,15 +414,14 @@ export type TriggerHandler = (
 export interface EffectOutcome {
   effectId: string
   fromEdgeId: string
-  /** executed = handler ran ok | skipped = no handler registered | failed = handler threw */
-  status: 'executed' | 'skipped' | 'failed'
-  /** Error message thrown by the handler. Present when status = 'failed'. */
+  success: boolean
+  /** Present when success = false — no handler registered, or the handler threw. */
   error?: string
 }
 
 /** Public result returned by Runtime.emit(). */
 export interface EventResult {
-  ok: boolean
+  success: boolean
   instance?: WorkflowInstance
   transitionsApplied?: TransitionStep[]
   effects?: EffectOutcome[]
@@ -246,7 +442,7 @@ export type TransitionListener = (
 /** Fires after createInstance() persists the new instance. */
 export type LifecycleListener = (instance: WorkflowInstance) => Promise<void>
 
-/** Fires when an effect handler throws or returns status 'failed'. */
+/** Fires when an effect has no handler registered, or its handler throws. */
 export type EffectFailedListener = (
   instance: WorkflowInstance,
   outcome: EffectOutcome,
@@ -261,9 +457,14 @@ export type AutomationFailedListener = (
 
 // ─── Storage interface ────────────────────────────────────────────────────────
 
-/** Abstraction over where instances are persisted. */
+/**
+ * Abstraction over where instances are persisted. `listInstances` takes no
+ * filter — filtering by `InstanceFilter.where` requires resolving BEP context
+ * (the current node's RACI, the workflow's name) that a storage backend
+ * doesn't have, so it happens in `Engine`, not here.
+ */
 export interface InstanceStore {
-  listInstances(filter?: InstanceFilter): Promise<WorkflowInstance[]>
+  listInstances(): Promise<WorkflowInstance[]>
   getInstance(instanceId: string): Promise<WorkflowInstance | null>
   saveInstance(instance: WorkflowInstance): Promise<void>
   deleteInstance(instanceId: string): Promise<void>

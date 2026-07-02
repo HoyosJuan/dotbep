@@ -395,9 +395,10 @@ export class Bep {
 
     const automationSig = (a: { payload?: { key: string; type: string; required: boolean }[]; output: { key: string; type: string; required: boolean }[] }): string => {
       const param = a.payload && a.payload.length > 0 ? `payload: ${inlineType(a.payload)}` : ''
-      const ret   = a.output.length === 0
-        ? '{ eventId: string }'
-        : `{ eventId: string; ${a.output.map(f => `${f.key}${f.required ? '' : '?'}: ${tsType(f.type)}`).join('; ')} }`
+      const success = a.output.length === 0
+        ? '{ success: true; eventId: string }'
+        : `{ success: true; eventId: string; ${a.output.map(f => `${f.key}${f.required ? '' : '?'}: ${tsType(f.type)}`).join('; ')} }`
+      const ret = `${success} | { success: false; error?: string }`
       return `(${param}) => ${ret}`
     }
 
@@ -413,7 +414,7 @@ export class Bep {
 
     const automationLines = this._data.automations.length
       ? this._data.automations.map(a => `${jsdoc(a.description)}  '${a.id}': ${automationSig(a)}`).join('\n')
-      : '  [key: string]: () => { eventId: string }'
+      : '  [key: string]: () => { success: true; eventId: string } | { success: false; error?: string }'
 
     const resolverLines = this._data.resolvers.length
       ? this._data.resolvers.map(r => `${jsdoc(r.description)}  '${r.id}': ${resolverSig(r)}`).join('\n')
