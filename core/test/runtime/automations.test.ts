@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { InstanceStore, WorkflowInstance } from '../../src/index.js'
 import { MemoryStorage } from '../../src/index.js'
 import { ACTOR, buildAutomationChainBep, createTestEngine, externalAsset } from '../helpers.js'
@@ -180,5 +180,159 @@ describe('automation nodes — arrival persistence', () => {
     // The transition that landed on auto1 made it through — the failed attempt on top of it did not.
     expect(raw!.history.some(e => e.type === 'transition' && e.toNodeId === 'auto1')).toBe(true)
     expect(raw!.history.some(e => e.type === 'automationAttempt')).toBe(false)
+  })
+})
+
+describe('retryAutomation', () => {
+  it('re-runs the handler at the current node with the payload that originally landed it there', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    let call = 0
+    const engine = createTestEngine(bep, {
+      automations: {
+        first: async () => {
+          call++
+          return call === 1 ? { success: false, error: 'ACC API timeout' } : { success: true, eventId: 'first-done', ok1: false }
+        },
+      },
+    })
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    const first = await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+    expect(first.instance!.currentNodeId).toBe('auto1')
+
+    const retried = await engine.workflows.retryAutomation(instance!.id)
+
+    expect(retried.success).toBe(true)
+    expect(retried.instance!.status).toBe('completed')
+    expect(retried.instance!.currentNodeId).toBe('end')
+
+    const attempts = retried.instance!.history.filter(e => e.type === 'automationAttempt')
+    expect(attempts).toHaveLength(2)
+    expect(attempts[0]).toMatchObject({ automationId: 'first', success: false })
+    expect(attempts[1]).toMatchObject({ automationId: 'first', success: true })
+  })
+
+  it('does not fire onTransition — it is not a transition, just a re-execution', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    let call = 0
+    const engine = createTestEngine(bep, {
+      automations: {
+        first: async () => {
+          call++
+          return call === 1 ? { success: false, error: 'boom' } : { success: true, eventId: 'first-done', ok1: false }
+        },
+      },
+    })
+    const onTransition = vi.fn(async () => {})
+    engine.workflows.onTransition(onTransition)
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+    onTransition.mockClear()
+
+    await engine.workflows.retryAutomation(instance!.id)
+
+    expect(onTransition).not.toHaveBeenCalled()
+  })
+
+  it('fails with NOT_AT_AUTOMATION_NODE when the instance is not parked at an automation node', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep)
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+
+    const result = await engine.workflows.retryAutomation(instance!.id)
+
+    expect(result).toEqual({ success: false, error: 'NOT_AT_AUTOMATION_NODE' })
+  })
+})
+
+describe('revertAutomation', () => {
+  it('moves the instance back to the process node that fed the automation, recording a RevertRecord', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep, {
+      automations: { first: async () => ({ success: false, error: 'ACC API timeout' }) },
+    })
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+
+    const result = await engine.workflows.revertAutomation(instance!.id, ACTOR)
+
+    expect(result.success).toBe(true)
+    expect(result.instance!.currentNodeId).toBe('resolve')
+    expect(result.instance!.status).toBe('active')
+
+    const revert = result.instance!.history.at(-1)
+    expect(revert).toMatchObject({ type: 'automationRevert', fromNodeId: 'auto1', toNodeId: 'resolve', actor: ACTOR })
+
+    // Prior attempts stay in history — nothing is erased.
+    expect(result.instance!.history.some(e => e.type === 'automationAttempt' && e.success === false)).toBe(true)
+  })
+
+  it('does not fire onTransition — it only moves the pointer', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep, {
+      automations: { first: async () => ({ success: false, error: 'boom' }) },
+    })
+    const onTransition = vi.fn(async () => {})
+    engine.workflows.onTransition(onTransition)
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+    onTransition.mockClear()
+
+    await engine.workflows.revertAutomation(instance!.id, ACTOR)
+
+    expect(onTransition).not.toHaveBeenCalled()
+  })
+
+  it('allows re-emitting the original event after reverting, as if it never reached the automation', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    let call = 0
+    const engine = createTestEngine(bep, {
+      automations: {
+        first: async () => {
+          call++
+          return call === 1 ? { success: false, error: 'boom' } : { success: true, eventId: 'first-done', ok1: false }
+        },
+      },
+    })
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+    await engine.workflows.revertAutomation(instance!.id, ACTOR)
+
+    const result = await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+
+    expect(result.success).toBe(true)
+    expect(result.instance!.status).toBe('completed')
+  })
+
+  it('fails with NOT_AT_AUTOMATION_NODE when the instance is not parked at an automation node', async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep)
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+
+    const result = await engine.workflows.revertAutomation(instance!.id, ACTOR)
+
+    expect(result).toEqual({ success: false, error: 'NOT_AT_AUTOMATION_NODE' })
+  })
+
+  it("fails with NO_REVERTIBLE_PREDECESSOR when the predecessor isn't a process node", async () => {
+    const { bep, workflowId } = buildAutomationChainBep()
+    const engine = createTestEngine(bep, {
+      automations: {
+        first:  async () => ({ success: true, eventId: 'first-done', ok1: true }), // routes to auto2 via decision1
+        second: async () => ({ success: false, error: 'boom' }),
+      },
+    })
+
+    const instance = await engine.workflows.create(workflowId, externalAsset(), ACTOR)
+    const emitted = await engine.workflows.emit(instance!.id, { eventId: 'go', actor: ACTOR })
+    expect(emitted.instance!.currentNodeId).toBe('auto2') // preceded by decision1, not a process node
+
+    const result = await engine.workflows.revertAutomation(instance!.id, ACTOR)
+
+    expect(result).toEqual({ success: false, error: 'NO_REVERTIBLE_PREDECESSOR' })
   })
 })
