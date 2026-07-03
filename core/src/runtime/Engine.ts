@@ -23,6 +23,8 @@ import type {
   TransitionDeniedRecord,
   AutomationResult,
   EffectExecutionRecord,
+  TransitionRecord,
+  RevertRecord,
 } from './types.js'
 
 /** Plain `Omit` collapses a discriminated union to its common fields — this distributes over each member instead. */
@@ -84,6 +86,16 @@ export class Engine {
     cancel(instanceId: string, actor: string): Promise<void>
     getStatus(instanceId: string): Promise<WorkflowStatus | null>
     resolveContext(instanceId: string): Promise<Record<string, unknown>>
+    /** Re-executes the automation handler at the instance's current node, reusing the payload that originally landed it there. Only valid when parked at an `automation` node. */
+    retryAutomation(instanceId: string): Promise<EventResult>
+    /**
+     * Moves the instance back to the `process` node that fed its current automation node, without
+     * re-running anything — the caller re-emits the original event once ready. Only available when
+     * that predecessor (resolved from this instance's own `history`) is a `process` node; reverting
+     * to a `decision`/`automation` predecessor, or to `start`, has nothing for a human to redo.
+     * Does not fire `onTransition` — no transition occurred, just a pointer move.
+     */
+    revertAutomation(instanceId: string, actor: string): Promise<EventResult>
     onTransition(listener: TransitionListener): Engine
     onCreated(listener: LifecycleListener): Engine
     onCompleted(listener: LifecycleListener): Engine
@@ -104,6 +116,8 @@ export class Engine {
       cancel:            (iId, actor)      => this._cancel(iId, actor),
       getStatus:         (iId)             => this._getStatus(iId),
       resolveContext:    (iId)             => this._resolveContext(iId),
+      retryAutomation:   (iId)             => this._retryAutomation(iId),
+      revertAutomation:  (iId, actor)      => this._revertAutomation(iId, actor),
       onTransition:      (l)              => { this._transitionListeners.push(l);       return this },
       onCreated:         (l)              => { this._createdListeners.push(l);          return this },
       onCompleted:       (l)              => { this._completedListeners.push(l);        return this },
@@ -354,6 +368,79 @@ export class Engine {
       Object.assign(result, event.trigger.payload ?? {})
     }
     return result
+  }
+
+  private async _retryAutomation(instanceId: string): Promise<EventResult> {
+    this._assertInit()
+    const instance = await this.storage.getInstance(instanceId)
+    if (!instance) return { success: false, error: 'NO_MATCHING_EDGE' }
+    if (instance.status !== 'active') return { success: false, error: 'INSTANCE_NOT_ACTIVE' }
+
+    const bep      = this.getBep()
+    const workflow = bep.workflows.find(w => w.id === instance.workflowId)
+    const node     = workflow?.diagram.nodes[instance.currentNodeId]
+    if (!node || node.type !== 'automation' || !node.automationId) {
+      return { success: false, error: 'NOT_AT_AUTOMATION_NODE' }
+    }
+
+    const triggerPayload = this._landingTriggerPayload(instance)
+
+    const transitions: TransitionStep[] = []
+    const effects:     EffectOutcome[]  = []
+    const current = await this._runAutomationChain(
+      bep, instance, { automationId: node.automationId, triggerPayload }, transitions, effects,
+    )
+
+    await this.storage.saveInstance(current)
+    if (current.status === 'completed') {
+      await this._fire(this._completedListeners, current)
+    }
+
+    return { success: true, instance: current, transitionsApplied: transitions, effects }
+  }
+
+  private async _revertAutomation(instanceId: string, actor: string): Promise<EventResult> {
+    this._assertInit()
+    const instance = await this.storage.getInstance(instanceId)
+    if (!instance) return { success: false, error: 'NO_MATCHING_EDGE' }
+    if (instance.status !== 'active') return { success: false, error: 'INSTANCE_NOT_ACTIVE' }
+
+    const bep      = this.getBep()
+    const workflow = bep.workflows.find(w => w.id === instance.workflowId)
+    const node     = workflow?.diagram.nodes[instance.currentNodeId]
+    if (!node || node.type !== 'automation') {
+      return { success: false, error: 'NOT_AT_AUTOMATION_NODE' }
+    }
+
+    const landing        = this._landingTransition(instance)
+    const predecessorId   = landing?.fromNodeId
+    const predecessorNode = predecessorId ? workflow?.diagram.nodes[predecessorId] : undefined
+    if (!predecessorId || predecessorNode?.type !== 'process') {
+      return { success: false, error: 'NO_REVERTIBLE_PREDECESSOR' }
+    }
+
+    const fromNodeId = instance.currentNodeId
+    const reverted = this._appendHistory<RevertRecord>(
+      { ...instance, currentNodeId: predecessorId, updatedAt: new Date().toISOString() },
+      { type: 'automationRevert', fromNodeId, toNodeId: predecessorId, actor },
+    )
+
+    await this.storage.saveInstance(reverted)
+    return { success: true, instance: reverted }
+  }
+
+  /** The `TransitionRecord` that landed the instance on its current node, if any. */
+  private _landingTransition(instance: WorkflowInstance): TransitionRecord | undefined {
+    for (let i = instance.history.length - 1; i >= 0; i--) {
+      const entry = instance.history[i]
+      if (entry.type === 'transition' && entry.toNodeId === instance.currentNodeId) return entry
+    }
+    return undefined
+  }
+
+  /** The payload of the event that landed the instance on its current node — identical to what the automation ran with originally. */
+  private _landingTriggerPayload(instance: WorkflowInstance): Record<string, unknown> {
+    return this._landingTransition(instance)?.trigger.payload ?? {}
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────────────

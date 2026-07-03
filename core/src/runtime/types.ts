@@ -69,10 +69,11 @@ export type AutomationAttemptRecord = {
 } & ({ success: true } | { success: false; error: string })
 
 /**
- * Reserved for a future `revertAutomation` operation that moves an instance
- * back from a failed automation node to the process node that fed it —
- * only ever available when that predecessor is resolvable from `history` for
- * this specific instance. Not produced by the engine yet.
+ * Produced by `revertAutomation`, which moves an instance back from a failed
+ * automation node to the process node that fed it — only ever available when
+ * that predecessor is resolvable from `history` for this specific instance
+ * and is itself a `process` node (the only node type with RACI, i.e. the only
+ * one where a human actually provided the payload there is something to redo).
  */
 export interface RevertRecord {
   type: 'automationRevert'
@@ -328,6 +329,16 @@ export type ProcessEventError =
   | 'UNAUTHORIZED'
   | 'INVALID_PAYLOAD'
 
+/**
+ * Errors specific to automation recovery (`retryAutomation`, `revertAutomation`).
+ * Kept separate from `ProcessEventError` because these never go through
+ * `processEvent()`'s edge-matching logic — they're precondition checks on the
+ * instance's current position, not transition-matching outcomes.
+ */
+export type AutomationRecoveryError =
+  | 'NOT_AT_AUTOMATION_NODE'
+  | 'NO_REVERTIBLE_PREDECESSOR'
+
 export interface PayloadFieldError {
   field: string
   reason: 'missing' | 'wrong_type' | 'unknown_field' | 'invalid_format'
@@ -416,7 +427,7 @@ export interface EventResult {
   instance?: WorkflowInstance
   transitionsApplied?: TransitionStep[]
   effects?: EffectOutcome[]
-  error?: ProcessEventError
+  error?: ProcessEventError | AutomationRecoveryError
   /** Present when error = 'INVALID_PAYLOAD'. */
   payloadErrors?: PayloadFieldError[]
 }
