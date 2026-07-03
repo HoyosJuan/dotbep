@@ -74,6 +74,63 @@ function validateDiagram(diagram: FlowDiagram, bep: BEP, workflowId: string): st
       errors.push(`node "${nodeKey}" has no outgoing edges — workflow would get stuck here`)
   }
 
+  // ── Synchronous cycle check (automation/decision subgraph) ──
+  // A `process` node always breaks a cycle — it waits for a human-triggered
+  // event. `automation` and `decision` nodes advance on their own the moment
+  // the instance lands on them, so any cycle formed purely of these two types
+  // is a synchronous loop the engine can't escape without human input. It's
+  // only bounded by the runtime safety valves (`MAX_SERVICE_DEPTH` in
+  // Engine.ts, `MAX_DECISION_DEPTH` in transitions.ts) — past that limit the
+  // instance goes silently stranded. Detect it at authoring time instead.
+  const autoDecisionKeys = new Set(
+    nodeKeys.filter(k => diagram.nodes[k].type === 'automation' || diagram.nodes[k].type === 'decision'),
+  )
+  const autoDecisionAdjacency: Record<string, string[]> = {}
+  for (const edge of Object.values(diagram.edges)) {
+    if (!autoDecisionKeys.has(edge.from) || !autoDecisionKeys.has(edge.to)) continue
+    autoDecisionAdjacency[edge.from] ??= []
+    autoDecisionAdjacency[edge.from].push(edge.to)
+  }
+
+  const WHITE = 0, GRAY = 1, BLACK = 2
+  const color = new Map<string, number>()
+  const reportedCycles = new Set<string>()
+
+  const findCycle = (start: string): void => {
+    const stack: string[] = [start]
+    color.set(start, GRAY)
+
+    const dfs = (nodeKey: string): string[] | null => {
+      for (const next of autoDecisionAdjacency[nodeKey] ?? []) {
+        const c = color.get(next) ?? WHITE
+        if (c === GRAY) return [...stack.slice(stack.indexOf(next)), next]
+        if (c === WHITE) {
+          color.set(next, GRAY)
+          stack.push(next)
+          const found = dfs(next)
+          if (found) return found
+          stack.pop()
+          color.set(next, BLACK)
+        }
+      }
+      return null
+    }
+
+    const cycle = dfs(start)
+    if (cycle) {
+      const key = [...new Set(cycle)].sort().join(',')
+      if (!reportedCycles.has(key)) {
+        reportedCycles.add(key)
+        errors.push(`synchronous cycle detected among automation/decision nodes: ${cycle.join(' → ')} — the engine would loop without human input`)
+      }
+    }
+    color.set(start, BLACK)
+  }
+
+  for (const nodeKey of autoDecisionKeys) {
+    if ((color.get(nodeKey) ?? WHITE) === WHITE) findCycle(nodeKey)
+  }
+
   // ── Guard field validation against predecessor outputs ──
   // For each decision node, collect the context fields its direct predecessors
   // produce (automation output or event payload), then verify every guard field
