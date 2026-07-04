@@ -1,0 +1,46 @@
+[
+  {
+    "path": "docs/adrs/bep-data-categories.md",
+    "description": "The .bep file hosts two distinct data categories: versioned plan data and immutable curated artifacts."
+  },
+  {
+    "path": "docs/adrs/bep-zip-write-model.md",
+    "description": "High-write-frequency or randomly-accessed data lives outside the .bep for operational use; it may still be included as an immutable archival snapshot."
+  },
+  {
+    "path": "docs/adrs/baseline-mirror.md",
+    "description": "baseline/ must always be a full structural mirror of the .bep root for any collection with a lifecycle distinct from the plan."
+  },
+  {
+    "path": "docs/adrs/explicit-operations.md",
+    "description": "Each operation (commit, discard, reset, squash) does exactly what its target specifies, with no implicit side effects on other targets."
+  },
+  {
+    "path": "docs/adrs/inverse-diff-history.md",
+    "description": "Version history is stored as inverse diffs applied backward from the current state, so bep.json always reflects the latest version at zero reconstruction cost."
+  },
+  {
+    "path": "docs/adrs/two-number-versioning.md",
+    "description": "BEPs are versioned as two numbers, {major}.{minor} — minor for in-progress patches, major for significant milestones."
+  },
+  {
+    "path": "docs/adrs/flat-id-based-schema.md",
+    "description": "Relationships between schema entities are expressed via ID references, never by nesting the referenced entity inline."
+  },
+  {
+    "path": "docs/adrs/self-explanatory-schema-keys.md",
+    "description": "Schema keys are always fully spelled out, never abbreviated, so they are legible without external documentation."
+  },
+  {
+    "path": "docs/adrs/no-persisted-derivable-data.md",
+    "description": "Data that can be derived deterministically from existing schema entities is computed on demand, never persisted as its own field or entity."
+  },
+  {
+    "path": "docs/adrs/llm-native-constructs.md",
+    "description": "The format includes constructs designed for direct LLM authorship and consumption (skills, memories, flags), each using the representation natural to that purpose."
+  },
+  {
+    "path": "docs/adrs/memory-slug-ids.md",
+    "description": "Memory IDs are human-readable kebab-case slugs, not UUIDs, so references are legible directly in markdown and filenames."
+  }
+]

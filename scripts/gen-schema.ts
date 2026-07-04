@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { join, dirname } from 'path'
-import { BEPSchema, ChangelogSchema } from '../core/src/types/schema.ts'
+import { BEPSchema, ChangelogSchema } from '../src/types/schema.ts'
 
 const output = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',

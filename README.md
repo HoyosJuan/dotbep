@@ -20,7 +20,7 @@ The BEP data is designed to answer:
 | What is this document about? | `project.description` |
 | What project are we working on? | `project` — `name`, `code`, `clientId` |
 | Who will participate? | `members`, `roles`, `teams` |
-| What will each participant do? | `roles` → `teams` → `members`, RACI per workflow node |
+| What will each participant do? | RACI per workflow node |
 | What will we do and why? | `bimUses`, `objectives` |
 | What do we need to do it? | `softwares`, `bimUses[].software` |
 | What is the model scope? | `lods`, `lois`, `loin` |
@@ -65,27 +65,6 @@ project.bep
         └── resources/
             └── {filename}           ← supporting files for the skill
 ```
-
----
-
-## Key design decisions
-
-- Every schema entity is connected with others.
-- Every schema entity has a clear and justifiable purpose in runtime.
-- Every key in the schema is very self-explanatory, no matter if its verbose.
-- **Everything is flat with ID-based references** — no deeply nested objects. `teams` have `memberEmails: string[]`, not nested Member objects.
-- **`bep.json` always reflects the current state** (latest version). History is reconstructed by applying inverse diffs backwards.
-- BEPs are versioned as **two-number `{major}.{minor}`**.
-- There are files such as skills and memories which are LLM-first.
-- There are schema entities, such as flags, wich are LLM-first.
-- Some data can be derived from the existing schema entities, so no need to have them explicit to avoid bloated files:
-  - Naming code for any deliverable
-  - Responsibility matrix (crossing `FlowNode` RACI role IDs with `roles`, `members` and `teams`)
-  - TIDP per team (filtering `deliverables` by `responsibleId`)
-  - MIDP (all deliverables)
-  - ISO 19650 team diagram (graph of `teams` by `isoRole`)
-  - Any historical version (applying inverse diffs backwards from `bep.json`)
-  - etc...
 
 ---
 

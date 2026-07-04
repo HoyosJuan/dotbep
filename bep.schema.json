@@ -31,6 +31,34 @@
           "websiteUrl": {
             "type": "string",
             "format": "uri"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string"
+              },
+              "coordinates": {
+                "description": "[longitude, latitude] — GeoJSON order",
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "customData": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
           }
         },
         "required": [
@@ -577,12 +605,44 @@
                     "enum": [
                       "string",
                       "number",
-                      "boolean",
-                      "url"
+                      "boolean"
                     ]
                   },
                   "required": {
                     "type": "boolean"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "validation": {
+                    "type": "object",
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "flags": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pattern"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "validationMessage": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [
@@ -635,12 +695,44 @@
                     "enum": [
                       "string",
                       "number",
-                      "boolean",
-                      "url"
+                      "boolean"
                     ]
                   },
                   "required": {
                     "type": "boolean"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "validation": {
+                    "type": "object",
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "flags": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pattern"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "validationMessage": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [
@@ -695,12 +787,44 @@
                     "enum": [
                       "string",
                       "number",
-                      "boolean",
-                      "url"
+                      "boolean"
                     ]
                   },
                   "required": {
                     "type": "boolean"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "validation": {
+                    "type": "object",
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "flags": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pattern"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "validationMessage": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [
@@ -725,12 +849,44 @@
                     "enum": [
                       "string",
                       "number",
-                      "boolean",
-                      "url"
+                      "boolean"
                     ]
                   },
                   "required": {
                     "type": "boolean"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "validation": {
+                    "type": "object",
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "flags": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pattern"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "validationMessage": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [
@@ -740,7 +896,7 @@
                 ],
                 "additionalProperties": false
               },
-              "description": "Fields the handler must return. Guards on outgoing edges reference these."
+              "description": "Fields the handler returns. Only relevant if this automation node is followed by a decision node — its guards reference these fields to branch on the output."
             }
           },
           "required": [
@@ -750,7 +906,7 @@
             "output"
           ],
           "additionalProperties": false,
-          "description": "A system-executed node in a workflow. Runs a handler automatically, produces a typed output, and must be followed by a decision node that branches on that output."
+          "description": "A system-executed node in a workflow. Runs a handler declared by the BEP runtime automatically."
         }
       },
       "env": {
@@ -796,7 +952,7 @@
             "description": {
               "type": "string",
               "minLength": 1,
-              "description": "Describe what external data this fetches, from where, and what format it returns: which service or API it calls, what credentials it needs, and the shape of the raw payload it returns so the runtime developer and adapter author know what to expect."
+              "description": "Describe what external data this fetches, from where, and what format it returns: which service or API it calls, what credentials it needs, and the shape of the raw payload it returns."
             },
             "envKeys": {
               "type": "array",
@@ -815,35 +971,6 @@
           ],
           "additionalProperties": false,
           "description": "A server-side handler declared in the BEP bundle that authenticates against an external service, fetches data, and returns a raw payload for a live resource."
-        }
-      },
-      "adapters": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Human-readable slug, e.g. \"discipline-progress\""
-            },
-            "name": {
-              "type": "string",
-              "minLength": 1
-            },
-            "description": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Describe the input format (resolver output shape), the transformation applied, and the output format (lens-compatible shape) so the runtime developer can implement the correct mapping."
-            }
-          },
-          "required": [
-            "id",
-            "name",
-            "description"
-          ],
-          "additionalProperties": false,
-          "description": "A transformation function declared in the BEP bundle that converts resolver output into a compatible format."
         }
       },
       "remoteData": {
@@ -1729,7 +1856,6 @@
       "automations",
       "env",
       "resolvers",
-      "adapters",
       "remoteData",
       "workflows",
       "guides",

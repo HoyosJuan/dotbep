@@ -1,21 +1,47 @@
 {
-  "name": "dotbep",
+  "name": "@dotbep/core",
+  "version": "0.2.22",
   "type": "module",
   "author": {
     "email": "juan.hoyos4@gmail.com",
     "name": "Juan Hoyos"
   },
-  "workspaces": [
-    "core"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "example": "npm run example -w @dotbep/core",
-    "build:core": "npm run build -w @dotbep/core",
+    "build:lib": "vite build",
     "build:schema": "node --experimental-strip-types scripts/gen-schema.ts",
-    "build": "npm run build:core && npm run build:schema",
-    "publish": "npm publish -w @dotbep/core"
+    "build": "npm run build:lib && npm run build:schema",
+    "prepublishOnly": "npm run build",
+    "example": "node --experimental-strip-types examples/run-all.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "fast-json-patch": "3.1.1",
+    "jszip": "3.10.1"
+  },
+  "peerDependencies": {
+    "zod": "^4.0"
   },
   "devDependencies": {
-    "typescript": "~5.9.3"
+    "@types/node": "22.19.13",
+    "typescript": "~5.9.3",
+    "vite": "^7.0.0",
+    "vite-plugin-dts": "4.5.4",
+    "vitest": "^4.1.9",
+    "zod": "4.4.3"
   }
 }

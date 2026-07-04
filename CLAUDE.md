@@ -2,68 +2,76 @@
 
 ## ADRs
 
-ADRs in `core/adrs/` document decisions about the `.bep` format and the core library. They must not reference specific consumers, external systems, or layers outside of core — only the format itself and its internal constraints.
+ADRs in `docs/adrs/` document decisions about the `.bep` format and the core library. They must not reference specific consumers, external systems, or layers outside of core — only the format itself and its internal constraints.
 
-At the start of every session involving core, read all files in `core/adrs/` before making any decisions or changes.
+At the start of every session involving core, read all files in `docs/adrs/` before making any decisions or changes.
+
+### `docs/adrs/index.json`
+
+`docs/adrs/index.json` is a `{ path: string, description: string }[]` index of every ADR, meant to be fetched on its own (e.g. hosted on GitHub) so an LLM can discover all past decisions without reading every file.
+
+- **New ADR** — add an entry for it to `index.json` in the same change.
+- **Modified ADR** — check whether the change affects what the `description` says; update it if so.
 
 ## Structure
 
-```
-core/    — @dotbep/core (publishable library)
-docs/    — format and schema documentation (MD)
-```
+This repo root **is** `@dotbep/core` (publishable library). `docs/` holds format and schema documentation (MD).
 
-### Key files in `core/`
+### Key files
 
-- `core/src/types/schema.ts` — Zod schemas + inferred TypeScript types (source of truth)
-- `core/src/types/resolved.ts` — resolved types (`RaciMatrix`, `TeamResolved`, `DeliverableResolved`, etc.)
-- `core/src/base/entity.ts` — base `Entity<T>` with bulk CRUD + referential integrity
-- `core/src/base/history.ts` — History class (versioning, diffs, snapshots)
-- `core/src/utils/lbs.ts` — `buildParentMap`, `getRootIds`, `resolveLBSCodes`, `validateLBS`
-- `core/src/utils/nomenclature.ts` — `buildConsecutivoMap`, `getNomenCode`, `buildCodeMap`
-- `core/src/utils/normalize.ts` — `normalizeBep`
-- `core/src/utils/diff.ts` — `diffEntities`, `arrayDefs`, `diffBep`
-- `core/example.ts` — exhaustive API usage example (`npm run example`)
+- `src/types/schema.ts` — Zod schemas + inferred TypeScript types (source of truth)
+- `src/types/resolved.ts` — resolved types (`RaciMatrix`, `TeamResolved`, `DeliverableResolved`, etc.)
+- `src/base/entity.ts` — base `Entity<T>` with bulk CRUD + referential integrity
+- `src/base/history.ts` — History class (versioning, diffs, snapshots)
+- `src/utils/lbs.ts` — `buildParentMap`, `getRootIds`, `resolveLBSCodes`, `validateLBS`
+- `src/utils/nomenclature.ts` — `buildConsecutivoMap`, `getNomenCode`, `buildCodeMap`
+- `src/utils/normalize.ts` — `normalizeBep`
+- `src/utils/diff.ts` — `diffEntities`, `arrayDefs`, `diffBep`
+- `examples/` — exhaustive API usage examples (`npm run example`)
 
 ### Root scripts
 
 ```bash
-npm run build          # build:core (+ gen schema)
-npm run build:core     # core library + regenerates bep.schema.json
-npm run publish:core   # publish @dotbep/core to npm
-npm run example        # runs all authoring examples in sequence
-npm run schema         # regenerates bep.schema.json only
-npm run schema:diagram # generates schema ER diagram (schema.html)
+npm run build        # build:lib + build:schema
+npm run build:lib    # builds the library (dist/)
+npm run build:schema # regenerates bep.schema.json
+npm run example      # runs all authoring examples in sequence
+npm run test         # runs the test suite
 ```
 
 ---
 
 ## Rule: running examples
 
-Before executing any file in `core/examples/`, always follow these steps in order:
+Before executing any file in `examples/`, always follow these steps in order, from the repo root:
 
-1. `npm run build:core` from the repo root (`core/`) — the examples import from `../dist/index.js`
-2. Type-check the example: `npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck examples/<file>.ts` (run from `core/core/`)
+1. `npm run build:lib` — the examples import from `../dist/index.js`
+2. Type-check the example: `npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck examples/<file>.ts`
 3. Fix any type errors before running
-4. Execute: `node --experimental-strip-types examples/<file>.ts` (run from `core/core/`)
+4. Execute: `node --experimental-strip-types examples/<file>.ts`
 
 ---
 
-## Rule: verifying changes with examples
+## Rule: verifying changes with examples and tests
 
-Any change to existing code in `core/src/` — no matter how small — must be verified by running the examples (`npm run example`, following the steps in "Rule: running examples" above) before the change is considered done. Confirm every example still runs without errors.
+Any change to existing code in `src/` — no matter how small — must be verified by:
 
-When implementing a new feature (not just modifying existing behavior), also decide and state explicitly whether it fits into an existing example (extend it to exercise the new behavior) or needs a new file under `core/examples/`. Propose which one before writing the feature's code — don't leave this as an afterthought.
+1. Running the examples (`npm run example`, following the steps in "Rule: running examples" above). Confirm every example still runs without errors.
+2. Running the test suite (`npm test`). Confirm every test still passes.
+
+When implementing a new feature (not just modifying existing behavior), also decide and state explicitly whether it fits into an existing example (extend it to exercise the new behavior) or needs a new file under `examples/`. Propose which one before writing the feature's code — don't leave this as an afterthought.
+
+The same applies to tests: if the change isn't covered by the existing suite, add new tests under `test/` (or extend an existing one) so the behavior is verified going forward — don't leave new functionality untested.
 
 ---
 
 ## Rule: schema changes
 
-Any modification to `core/src/types/schema.ts` requires analyzing the full impact before applying the change.
+Any modification to `src/types/schema.ts` requires analyzing the full impact before applying the change, and explicitly stating that impact to the user before writing the code — don't leave it as an afterthought.
 
 ### Backward compatibility: new arrays in `bep.json`
 
-When a new array is added to the `BEP` interface, existing BEPs won't have that field. Add it to `normalizeBep` in `core/src/utils/normalize.ts` with `??=` so consumers don't fail on old files:
+When a new array is added to the `BEP` interface, existing BEPs won't have that field. Add it to `normalizeBep` in `src/utils/normalize.ts` with `??=` so consumers don't fail on old files:
 
 ```typescript
 bep.newArray ??= []
