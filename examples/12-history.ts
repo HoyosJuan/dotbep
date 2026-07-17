@@ -49,11 +49,16 @@ console.log('\n--- changes for v0.2 ---')
 
 bep.roles.add([{ name: 'BIM Author', color: '#22CC88' }])
 bep.standards.setContent(stdNamingId, '# Naming Convention v3\nRevised rules after client review.')
+bep.resolvers.add([{ id: 'weather-api', name: 'Weather API', description: 'Fetches current site weather.', envKeys: [] }])
+bep.remoteData.add([{ name: 'Site weather', description: 'Live weather feed for the site.', url: 'https://example.com/weather', resolverId: 'weather-api' }])
 
-// status() reports what changed since the last commit
+// status() reports what changed since the last commit — including resolvers
+// and remoteData, which previously went undetected (arrayDefs was missing them).
 const st02 = await bep.history.status()
 console.log('pending — standards:', st02.standards)
 // → [{ status: 'content-modified', id: stdNamingId }]
+console.log('pending — changed keys:', st02.changedKeys)
+// → includes 'resolvers' and 'remoteData'
 
 const v1 = await bep.history.commit({
   target:      'plan',
