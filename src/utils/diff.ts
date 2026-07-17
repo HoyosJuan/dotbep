@@ -3,7 +3,7 @@ import type {
   Role, Member, Team, Phase, Milestone, LBSNode,
   Discipline, Extension, AssetType, Software,
   Objective, BIMUse, Action, FlowEvent, FlowEffect, FlowAutomation, Workflow, Guide, Annex, Standard,
-  LOD, LOI, LOIN, Deliverable, Note, EnvVar,
+  LOD, LOI, LOIN, Deliverable, Note, EnvVar, Resolver, RemoteData,
 } from '../types/schema.js'
 import type { SectionDiff, BepDiff } from '../types/history.js'
 
@@ -52,6 +52,8 @@ export const arrayDefs = [
   def<Deliverable>   ('deliverables',    i => i.id,     i => i.description ?? i.id),
   def<Note>          ('notes',           i => i.id,     i => i.message),
   def<EnvVar>        ('env',             i => i.key,    i => i.key),
+  def<Resolver>      ('resolvers',       i => i.id,     i => i.name),
+  def<RemoteData>    ('remoteData',      i => i.id,     i => i.name),
 ]
 
 // ─── Core diff functions ──────────────────────────────────────────────────────
