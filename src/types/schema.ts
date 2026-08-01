@@ -455,6 +455,14 @@ export const FlowDiagramSchema = z.object({
       })
     }
 
+    if (node.type === 'process' && outs.length !== 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: `process node must have exactly one outgoing edge (found ${outs.length}) — branching belongs on a decision node.`,
+        path: ['nodes', nodeKey],
+      })
+    }
+
     if (node.type === 'decision' && outs.length < 2) {
       ctx.addIssue({
         code: "custom",

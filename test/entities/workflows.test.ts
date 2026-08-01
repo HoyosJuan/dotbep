@@ -247,14 +247,13 @@ describe('validateDiagram — reference and structural checks', () => {
         },
         edges: {
           e1: { from: 'start',   to: 'resolve' },
-          e2: { from: 'resolve', to: 'end',      triggerEventId: 'go' },
-          e3: { from: 'resolve', to: 'nonexistent', triggerEventId: 'e1' }, // extra edge — process nodes may have several
+          e2: { from: 'resolve', to: 'nonexistent', triggerEventId: 'go' },
         },
       },
     }])
 
     expect(result.succeeded).toHaveLength(0)
-    expect(result.failed[0]!.error).toMatch(/edge "e3": to node "nonexistent" not found/)
+    expect(result.failed[0]!.error).toMatch(/edge "e2": to node "nonexistent" not found/)
   })
 
   it('rejects an edge whose triggerEventId does not exist', () => {
@@ -440,14 +439,16 @@ describe('validateDiagram — reference and structural checks', () => {
         },
         edges: {
           e1: { from: 'start',   to: 'resolve' },
-          e2: { from: 'resolve', to: 'end',     triggerEventId: 'go' },
-          e3: { from: 'resolve', to: 'deadend', triggerEventId: 'e1' },
+          e2: { from: 'resolve', to: 'deadend', triggerEventId: 'go' },
         },
       },
     }])
 
     expect(result.succeeded).toHaveLength(0)
-    expect(result.failed[0]!.error).toMatch(/node "deadend" has no outgoing edges — workflow would get stuck here/)
+    // Caught by the schema's own per-node edge-count rule before validateDiagram's
+    // separate reachability check ever runs — process now requires exactly one
+    // outgoing edge, same as automation, so "zero" fails here first.
+    expect(result.failed[0]!.error).toMatch(/process node must have exactly one outgoing edge \(found 0\)/)
   })
 
   it('rejects a decision guard field not declared in its direct predecessor automation\'s output', () => {
