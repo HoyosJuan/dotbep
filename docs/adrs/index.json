@@ -42,5 +42,9 @@
   {
     "path": "docs/adrs/memory-slug-ids.md",
     "description": "Memory IDs are human-readable kebab-case slugs, not UUIDs, so references are legible directly in markdown and filenames."
+  },
+  {
+    "path": "docs/adrs/runtime-readonly-bep-snapshot.md",
+    "description": "Runtime handlers get this.bep as a structuredClone() typed Readonly<BEP> — never the authoring Entity API — so the plan can only ever be modified through the platform's own commit/discard operations."
   }
 ]
