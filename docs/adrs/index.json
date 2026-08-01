@@ -46,5 +46,9 @@
   {
     "path": "docs/adrs/runtime-readonly-bep-snapshot.md",
     "description": "Runtime handlers get this.bep as a structuredClone() typed Readonly<BEP> — never the authoring Entity API — so the plan can only ever be modified through the platform's own commit/discard operations."
+  },
+  {
+    "path": "docs/adrs/single-outgoing-edge-automation-process.md",
+    "description": "process nodes may have at most one outgoing edge, matching the rule automation already enforced — all branching must go through a decision node, checked in FlowDiagramSchema's superRefine."
   }
 ]
