@@ -138,6 +138,11 @@ export class Engine {
     this.skipRaci = config.events?.skipRaci ?? false
     // Inject engine reference into runtime so handlers can call this.engine.*
     ;(config.runtime as unknown as { _engine?: EngineRef })._engine = this
+    // Inject a detached snapshot of the plan so handlers can read this.bep.* —
+    // structuredClone(), not the live reference: see
+    // docs/adrs/runtime-readonly-bep-snapshot.md for why (handlers must never
+    // be able to mutate the plan, even by accident).
+    ;(config.runtime as unknown as { _bep?: BEP })._bep = structuredClone(this.getBep())
     return this
   }
 

@@ -1,4 +1,5 @@
 import type { WorkflowInstance, EffectHandler, AutomationHandler, AutomationResult, ResolverHandler, TriggerHandler, EngineRef } from './types.js'
+import type { BEP } from '../types/schema.js'
 
 export interface BepTypes {
   effects:     Record<string, (...args: any[]) => void>
@@ -24,7 +25,9 @@ export interface BepTypes {
  *       await sendEmail(this.env.SENDGRID_KEY, payload.to)
  *     })
  *     this.automation('check-approval', async (instance) => {
- *       return { success: true, eventId: 'approved' }
+ *       // this.bep is a read-only snapshot of the plan — safe to read, mutating it has no effect.
+ *       const disciplineNames = this.bep.disciplines.map(d => d.name)
+ *       return { success: true, eventId: 'approved', disciplineNames }
  *     })
  *     this.resolver('fetch-data', async (url) => {
  *       return fetch(url).then(r => r.json())
@@ -58,6 +61,17 @@ export class Runtime<T extends {
   get engine(): EngineRef {
     if (!this._engine) throw new Error('engine is not available yet — it is set during Engine.init()')
     return this._engine
+  }
+
+  /**
+   * Set by Engine.init() — available inside handlers via this.bep.
+   * A structuredClone() snapshot, not the live plan: mutating it never
+   * affects the actual BEP. See docs/adrs/runtime-readonly-bep-snapshot.md.
+   */
+  _bep: BEP | null = null
+  get bep(): Readonly<BEP> {
+    if (!this._bep) throw new Error('bep is not available yet — it is set during Engine.init()')
+    return this._bep
   }
 
   constructor({ env = {} }: RuntimeOptions = {}) {
