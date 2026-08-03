@@ -50,5 +50,9 @@
   {
     "path": "docs/adrs/single-outgoing-edge-automation-process.md",
     "description": "process nodes may have at most one outgoing edge, matching the rule automation already enforced — all branching must go through a decision node, checked in FlowDiagramSchema's superRefine."
+  },
+  {
+    "path": "docs/adrs/permissive-event-payload-validation.md",
+    "description": "Event payload schemas are a minimum contract (what's guaranteed present), not a closed one — validatePayload() never rejects or strips fields an automation/event includes beyond what's declared."
   }
 ]
