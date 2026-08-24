@@ -41,6 +41,13 @@ console.log('content paths:', stdAdded.succeeded.map(s => s.contentPath))  // uu
 const namingContent = await bep.standards.getContent(stdNamingId)
 console.log('\ngetContent (first 45 chars):', namingContent.slice(0, 45))
 
+// getResolvedContent — content with {{JSONata expression}} inline references
+// resolved against the live BEP, plain text (no markup). A reference that
+// doesn't resolve is left as a visible "⚠" marker, never silently dropped.
+const teamId = bep.teams.list()[0].id
+bep.standards.setContent(stdNamingId, `Owned by {{teams[id='${teamId}'].name}}. See also {{teams[id='ghost'].name}}.`)
+console.log('\ngetResolvedContent:', await bep.standards.getResolvedContent(stdNamingId))
+
 // setContent — overwrites the .md file in the zip; no append, caller owns the full string
 bep.standards.setContent(stdNamingId, '# Naming Convention v2\nRevised rules after client review.')
 const updated = await bep.standards.getContent(stdNamingId)

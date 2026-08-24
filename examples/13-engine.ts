@@ -127,7 +127,7 @@ const [{ id: workflowId }] = bep.workflows.add([{
 // bep.generateRuntimeTypes() produces a TypeScript contract from the BEP's runtime.
 // Commit bep.d.ts alongside your runtime so TypeScript can validate it.
 
-writeFileSync('examples/bep.d.ts', bep.generateRuntimeTypes())
+writeFileSync('examples/bep.d.ts', await bep.generateRuntimeTypes())
 console.log('Generated examples/bep.d.ts')
 
 // ─── 3. Declare the BEP Runtime ───────────────────────────────────────────────
