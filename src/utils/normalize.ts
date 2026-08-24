@@ -7,6 +7,9 @@ export function normalizeBep(bep: BEP): BEP {
   bep.phases         ??= []
   bep.milestones     ??= []
   bep.lbs            ??= []
+  bep.informationDomains ??= []
+  bep.referenceData      ??= []
+  bep.referenceData.forEach(n => { n.label ??= n.key })
   bep.disciplines    ??= []
   bep.extensions     ??= []
   bep.assetTypes     ??= []

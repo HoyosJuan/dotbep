@@ -167,6 +167,51 @@ export const LBSNodeSchema = LBSNodeBaseSchema
 
 export type LBSNode = z.infer<typeof LBSNodeSchema>
 
+// ─── Reference data ───────────────────────────────────────────────────────────
+
+/** A JSON-serializable value — no functions, no non-plain objects. */
+export const JsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+)
+
+export const InformationDomainSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+}).describe('A named category of information the project deals with — e.g. "topics" (status/type/priority for coordination issues) or "cde" (folder structure and file metadata conventions for the Common Data Environment). Groups referenceData nodes; standards may also associate with a domain to indicate which topic they document.')
+
+export type InformationDomain = z.infer<typeof InformationDomainSchema>
+
+export const ReferenceNodeBaseSchema = z.object({
+  id: z.uuid(),
+  informationDomainId: z.string().min(1)
+    .describe('ref InformationDomain.id'),
+  key: z.string().min(1)
+    .describe('Unique among siblings sharing the same informationDomainId and parentId — not unique globally or even within the whole domain. Used to build the resolved object when a domain is reconstructed.'),
+  label: z.string().min(1)
+    .describe('Human-readable identification for this node.'),
+  description: z.string().optional(),
+  parentId: z.uuid().optional()
+    .describe('ref ReferenceNode.id — omit for a node at the root of its domain.'),
+  data: z.record(z.string(), JsonValueSchema).optional()
+    .describe('Free-form attributes for this node. A string value may embed a {{JSONata expression}} reference, resolved on read.'),
+}).describe('A single entry of structured, domain-organized reference data meant to be queried by external integrations — e.g. one status value, one CDE folder. Nodes form a tree via parentId; the tree is reconstructed on demand, never stored nested.')
+
+export const ReferenceNodeSchema = ReferenceNodeBaseSchema
+  .refine(n => n.parentId !== n.id, {
+    message: 'A node cannot reference itself as its own parent.',
+    path: ['parentId'],
+  })
+
+export type ReferenceNode = z.infer<typeof ReferenceNodeSchema>
+
 export const DisciplineSchema = z.object({
   id: z.string().min(1)
     .describe('Used in deliverables nomenclature.'),
@@ -734,6 +779,8 @@ export const BEPSchema = z.object({
   phases:          z.array(PhaseSchema),
   milestones:      z.array(MilestoneSchema),
   lbs:             z.array(LBSNodeSchema),
+  informationDomains: z.array(InformationDomainSchema),
+  referenceData:      z.array(ReferenceNodeSchema),
   disciplines:     z.array(DisciplineSchema),
   extensions:      z.array(ExtensionSchema),
   assetTypes:      z.array(AssetTypeSchema),

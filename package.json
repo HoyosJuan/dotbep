@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "fast-json-patch": "3.1.1",
+    "jsonata": "^2.2.2",
     "jszip": "3.10.1"
   },
   "peerDependencies": {

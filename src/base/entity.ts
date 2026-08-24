@@ -13,6 +13,20 @@ export type BulkResult<T> = {
   failed: { id: string; error: string }[]
 }
 
+/**
+ * The `getBep` closure every entity holds, optionally carrying a hook that
+ * also blocks removal when a referenceData node's `data` still references
+ * the entity being removed (see ReferenceData.findRefsTo). Bep attaches this
+ * hook as a property on its own `bep` closure — once, per Bep instance — so
+ * every entity's remove() picks it up generically with no change to any
+ * entity subclass's constructor, and with no shared/global state that could
+ * leak across two concurrently-open Bep instances (each Bep has its own
+ * closure object to attach the property to).
+ */
+export type GetBep = (() => BEP) & {
+  referenceDataRefs?: (collection: string, id: string) => string[]
+}
+
 /** Input type for add() on non-autoId entities — id is optional, validated by the Zod schema */
 export type AddInput<T extends object> = Omit<T, 'id'> & { id?: string }
 
@@ -44,7 +58,7 @@ export class Entity<T extends object, AutoId extends boolean = false> {
 
   constructor(
     private getItems: () => T[],
-    protected getBep: () => BEP,
+    protected getBep: GetBep,
     private config: EntityConfig<T, AutoId>,
   ) {
     this.idField = config.idField ?? ('id' as keyof T)
@@ -135,7 +149,9 @@ export class Entity<T extends object, AutoId extends boolean = false> {
       }
       try {
         const active = checkRefs(id, this.config.key, this.getBep())
-        if (active.length) throw new Error(`Referenced by: ${active.join(', ')}`)
+        const dataRefs = this.getBep.referenceDataRefs?.(this.config.key, id) ?? []
+        const allRefs = [...active, ...dataRefs]
+        if (allRefs.length) throw new Error(`Referenced by: ${allRefs.join(', ')}`)
         this.config.beforeRemove?.(id, this.getBep())
         items.splice(index, 1)
         succeeded.push(id)

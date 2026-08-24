@@ -1,9 +1,12 @@
 import JSZip from 'jszip'
 import type { BEP, Memory, NamingConvention, Project, Report } from './types/schema.js'
+import type { ResolvedReferenceNode, ResolvedReferenceDomain } from './types/resolved.js'
 import { NamingConventionSchema, ProjectSchema } from './types/schema.js'
 import { normalizeBep } from './utils/normalize.js'
 import { validateTokenValue, validateAllTokens } from './utils/naming.js'
+import { resolveInformationDomain } from './utils/referenceData.js'
 import { Singleton } from './base/singleton.js'
+import type { GetBep } from './base/entity.js'
 import { Actions } from './entities/actions.js'
 import { Annexes } from './entities/annexes.js'
 import { Effects } from './entities/effects.js'
@@ -27,6 +30,8 @@ import { Members } from './entities/members.js'
 import { Milestones } from './entities/milestones.js'
 import { Objectives } from './entities/objectives.js'
 import { Phases } from './entities/phases.js'
+import { ReferenceData } from './entities/referenceData.js'
+import { InformationDomains } from './entities/informationDomains.js'
 import { RemoteDataEntity } from './entities/remoteData.js'
 import { Resolvers } from './entities/resolvers.js'
 import { Softwares } from './entities/softwares.js'
@@ -70,6 +75,8 @@ export class Bep {
   readonly milestones: Milestones
   readonly objectives: Objectives
   readonly phases: Phases
+  readonly referenceData: ReferenceData
+  readonly informationDomains: InformationDomains
   readonly remoteData: RemoteDataEntity
   readonly resolvers: Resolvers
   readonly softwares: Softwares
@@ -102,7 +109,12 @@ export class Bep {
     reportItems: Report[] = [],
     memoryItems: Memory[] = [],
   ) {
-    const bep = () => this._data
+    // Typed as GetBep (not a plain `() => BEP`) because the referenceDataRefs
+    // hook is attached to this exact closure below, once `this.referenceData`
+    // exists — every entity below shares this same closure via getBep, so the
+    // hook reaches all of them generically without touching any entity
+    // subclass's constructor.
+    const bep: GetBep = () => this._data
     this.project = new Singleton(
       () => this._data.project,
       (p) => { this._data.project = p },
@@ -137,6 +149,9 @@ export class Bep {
     this.milestones     = new Milestones(bep)
     this.objectives     = new Objectives(bep)
     this.phases         = new Phases(bep)
+    this.referenceData      = new ReferenceData(bep)
+    this.informationDomains = new InformationDomains(bep)
+    bep.referenceDataRefs = (collection, id) => this.referenceData.findRefsTo(collection, id)
     this.remoteData     = new RemoteDataEntity(bep)
     this.resolvers      = new Resolvers(bep)
     this.softwares      = new Softwares(bep, () => this.assetTypes)
@@ -243,6 +258,8 @@ export class Bep {
       phases: [],
       milestones: [],
       lbs: [],
+      informationDomains: [],
+      referenceData: [],
       disciplines: [],
       extensions: [],
       assetTypes: [],
@@ -378,9 +395,9 @@ export class Bep {
    *
    * @example
    * import { writeFileSync } from 'node:fs'
-   * writeFileSync('bep.d.ts', bep.generateRuntimeTypes())
+   * writeFileSync('bep.d.ts', await bep.generateRuntimeTypes())
    */
-  generateRuntimeTypes(): string {
+  async generateRuntimeTypes(): Promise<string> {
     const tsType = (t: string) => t
 
     const jsdoc = (description: string) => `  /** ${description} */\n`
@@ -441,6 +458,49 @@ export class Bep {
       ? this._data.softwares.map(s => `${jsdoc(s.name)}  '${s.id}': ${triggerSig}`).join('\n')
       : `  [key: string]: ${triggerSig}`
 
+    const pascalCase = (s: string): string =>
+      s.replace(/[-_]+(.)?/g, (_, c: string | undefined) => c ? c.toUpperCase() : '').replace(/^./, c => c.toUpperCase())
+
+    const jsonFieldType = (v: unknown): string => {
+      if (v === null) return 'null'
+      if (Array.isArray(v)) return 'unknown[]'
+      const t = typeof v
+      return t === 'string' || t === 'number' || t === 'boolean' ? t : 'unknown'
+    }
+
+    // Per-node exact typing: each node's `data` type is derived directly from
+    // its own currently-observed fields, not inferred/guessed across siblings —
+    // deliberately not "guessing" since data literally exists to draw from.
+    const referenceNodeType = (node: ResolvedReferenceNode, depth: number): string => {
+      const pad = '  '.repeat(depth)
+      const innerPad = '  '.repeat(depth + 1)
+      const parts: string[] = [`${innerPad}label: string`]
+      if (node.description !== undefined) parts.push(`${innerPad}description: string`)
+      if (node.data) {
+        const fields = Object.entries(node.data)
+          .map(([k, v]) => `${innerPad}  ${JSON.stringify(k)}: ${jsonFieldType(v)}`)
+          .join('\n')
+        parts.push(`${innerPad}data: {\n${fields}\n${innerPad}}`)
+      }
+      if (node.children) {
+        const childFields = Object.entries(node.children)
+          .map(([k, child]) => `${innerPad}  ${JSON.stringify(k)}: ${referenceNodeType(child, depth + 2)}`)
+          .join('\n')
+        parts.push(`${innerPad}children: {\n${childFields}\n${innerPad}}`)
+      }
+      return parts.length ? `{\n${parts.join('\n')}\n${pad}}` : '{}'
+    }
+
+    const referenceDataInterfaces = await Promise.all(this._data.informationDomains.map(async domain => {
+      const resolved: ResolvedReferenceDomain = await resolveInformationDomain(domain.id, this._data)
+      const interfaceName = `BepReferenceData${pascalCase(domain.id)}`
+      const doc = domain.description ? `${domain.name} — ${domain.description}` : domain.name
+      const entries = Object.entries(resolved)
+        .map(([key, node]) => `  ${JSON.stringify(key)}: ${referenceNodeType(node, 1)}`)
+        .join('\n')
+      return { interfaceName, domainId: domain.id, doc, entries }
+    }))
+
     const sections: string[] = [
       '// Generated by bep.generateRuntimeTypes() — do not edit manually',
       '',
@@ -489,14 +549,36 @@ export class Bep {
       envLines,
       '}',
       '',
+      '// ─── Reference Data ──────────────────────────────────────────────────────────',
+      '',
+    )
+
+    for (const { interfaceName, doc, entries } of referenceDataInterfaces) {
+      sections.push(
+        jsdoc(doc),
+        `export interface ${interfaceName} {`,
+        entries,
+        '}',
+        '',
+      )
+    }
+
+    sections.push(
+      'export interface BepReferenceData {',
+      referenceDataInterfaces
+        .map(r => `  ${JSON.stringify(r.domainId)}: ${r.interfaceName}`)
+        .join('\n'),
+      '}',
+      '',
       '// ─── Combined ─────────────────────────────────────────────────────────────────',
       '',
       'export interface BepTypes {',
-      '  effects:     BepEffects',
-      '  automations: BepAutomations',
-      '  resolvers:   BepResolvers',
-      '  triggers:    BepTriggers',
-      '  env:         BepEnv',
+      '  effects:       BepEffects',
+      '  automations:   BepAutomations',
+      '  resolvers:     BepResolvers',
+      '  triggers:      BepTriggers',
+      '  env:           BepEnv',
+      '  referenceData: BepReferenceData',
       '}',
       '',
     )

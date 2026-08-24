@@ -58,6 +58,10 @@ export const refs: ReferenceRule[] = [
   ({ entity: 'deliverables', references: 'deliverables',    inField: 'predecessorId'     }),
   // lbs (self-referential)
   ({ entity: 'lbs',          references: 'lbs',             inField: 'lbsNodeIds',       array: true }),
+  // informationDomains
+  ({ entity: 'referenceData', references: 'informationDomains', inField: 'informationDomainId' }),
+  // referenceData (self-referential)
+  ({ entity: 'referenceData', references: 'referenceData',   inField: 'parentId'         }),
 ]
 
 // ─── Checkers ─────────────────────────────────────────────────────────────────

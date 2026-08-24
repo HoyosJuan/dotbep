@@ -4,6 +4,7 @@ import type {
   Discipline, Extension, AssetType, Software,
   Objective, BIMUse, Action, FlowEvent, FlowEffect, FlowAutomation, Workflow, Guide, Annex, Standard,
   LOD, LOI, LOIN, Deliverable, Note, EnvVar, Resolver, RemoteData,
+  InformationDomain, ReferenceNode,
 } from '../types/schema.js'
 import type { SectionDiff, BepDiff } from '../types/history.js'
 
@@ -32,6 +33,8 @@ export const arrayDefs = [
   def<Phase>         ('phases',          i => i.id,     i => i.name),
   def<Milestone>     ('milestones',      i => i.id,     i => i.name),
   def<LBSNode>       ('lbs',             i => i.id,     i => `${i.id} — ${i.name} (${i.type})`),
+  def<InformationDomain>('informationDomains', i => i.id, i => `${i.id} — ${i.name}`),
+  def<ReferenceNode>    ('referenceData',      i => i.id, i => `${i.informationDomainId}/${i.key} — ${i.label}`),
   def<Discipline>    ('disciplines',     i => i.id,     i => `${i.id} — ${i.name}`),
   def<Extension>     ('extensions',      i => i.id,     i => i.id),
   def<AssetType>     ('assetTypes',       i => i.id,     i => `${i.id} — ${i.name}`),

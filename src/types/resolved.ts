@@ -135,3 +135,21 @@ export type DeliverableResolved = Omit<
 export type NoteResolved = Omit<Note, 'memberEmail'> & {
   member: MemberResolved | null
 }
+
+// ─── Reference data ───────────────────────────────────────────────────────────
+
+/**
+ * A single reconstructed referenceData node — always this uniform shape,
+ * whether the node actually has both, one, or neither, so a consumer never
+ * has to special-case what a given node happens to carry. See
+ * docs/adrs/reference-data.md.
+ */
+export type ResolvedReferenceNode = {
+  label: string
+  description?: string
+  data?: Record<string, unknown>
+  children?: Record<string, ResolvedReferenceNode>
+}
+
+/** A domain's referenceData nodes reconstructed into a nested object, keyed by each node's own `key`. */
+export type ResolvedReferenceDomain = Record<string, ResolvedReferenceNode>

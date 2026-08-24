@@ -20,5 +20,7 @@ export type {
   LOINResolved,
   DeliverableResolved,
   NoteResolved,
+  ResolvedReferenceNode,
+  ResolvedReferenceDomain,
 } from './resolved.js'
 export type { SectionDiff, BepDiff, BepStatus, StandardChange, CollectionPending, CommitParams, DiscardParams, SquashParams } from './history.js'

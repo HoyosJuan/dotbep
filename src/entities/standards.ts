@@ -2,6 +2,7 @@ import type JSZip from 'jszip'
 import type { BEP, Standard } from '../types/schema.js'
 import { Entity, type BulkResult } from '../base/entity.js'
 import { StandardSchema } from '../types/schema.js'
+import { resolveBepRefs } from '../utils/bepRefs.js'
 
 /** Input for Standards.add(): accepts markdown text in `content` instead of a file path. */
 export type StandardAddInput = Omit<Standard, 'id' | 'contentPath'> & { content: string }
@@ -57,6 +58,23 @@ export class Standards extends Entity<Standard, true> {
     const file = this.getZip().file(std.contentPath)
     if (!file) throw new Error(`Content file not found: ${std.contentPath}`)
     return file.async('string')
+  }
+
+  /**
+   * Returns the standard's content with every `{{...}}` inline reference
+   * replaced by its live resolved value — plain text, no markup. Meant for
+   * consumers that just want the final text (e.g. handing a standard's
+   * content to an LLM), not for rendering: a UI that needs to visually
+   * distinguish which parts are live references should locate `{{...}}`
+   * itself and resolve each one (via `resolveBepRefs`), since by the time
+   * this method returns, the reference boundaries are gone.
+   *
+   * A reference that no longer resolves is left as a visible `⚠` marker
+   * (see `resolveBepRefs`), never silently dropped.
+   */
+  async getResolvedContent(id: Standard['id']): Promise<string> {
+    const raw = await this.getContent(id)
+    return await resolveBepRefs(raw, this.getBep()) as string
   }
 
   /** Writes new markdown text content for the given standard. */

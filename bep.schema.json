@@ -356,6 +356,86 @@
           "description": "A spatial or functional subdivision of the project. LBS nodes form a hierarchy that scopes deliverables to specific spatial or functional areas."
         }
       },
+      "informationDomains": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false,
+          "description": "A named category of information the project deals with — e.g. \"topics\" (status/type/priority for coordination issues) or \"cde\" (folder structure and file metadata conventions for the Common Data Environment). Groups referenceData nodes; standards may also associate with a domain to indicate which topic they document."
+        }
+      },
+      "referenceData": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "informationDomainId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "ref InformationDomain.id"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Unique among siblings sharing the same informationDomainId and parentId — not unique globally or even within the whole domain. Used to build the resolved object when a domain is reconstructed."
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable identification for this node."
+            },
+            "description": {
+              "type": "string"
+            },
+            "parentId": {
+              "description": "ref ReferenceNode.id — omit for a node at the root of its domain.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "data": {
+              "description": "Free-form attributes for this node. A string value may embed a {{JSONata expression}} reference, resolved on read.",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "informationDomainId",
+            "key",
+            "label"
+          ],
+          "additionalProperties": false,
+          "description": "A single entry of structured, domain-organized reference data meant to be queried by external integrations — e.g. one status value, one CDE folder. Nodes form a tree via parentId; the tree is reconstructed on demand, never stored nested."
+        }
+      },
       "disciplines": {
         "type": "array",
         "items": {
@@ -1844,6 +1924,8 @@
       "phases",
       "milestones",
       "lbs",
+      "informationDomains",
+      "referenceData",
       "disciplines",
       "extensions",
       "assetTypes",
@@ -1868,7 +1950,40 @@
       "notes",
       "flags"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "$defs": {
+      "__schema0": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema0"
+            }
+          }
+        ]
+      }
+    }
   },
   "changelog": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
