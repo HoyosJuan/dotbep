@@ -54,5 +54,17 @@
   {
     "path": "docs/adrs/permissive-event-payload-validation.md",
     "description": "Event payload schemas are a minimum contract (what's guaranteed present), not a closed one — validatePayload() never rejects or strips fields an automation/event includes beyond what's declared."
+  },
+  {
+    "path": "docs/adrs/reference-data.md",
+    "description": "informationDomains/referenceData model structured, domain-organized facts (status enums, CDE folder structures) for external integrations — stored flat with parentId, key unique per-sibling only, reconstructed into a nested object on demand by InformationDomains.resolve(). Each node has a required human-readable label (key is the technical/structural identifier, not meant for display). Live references use JSONata expressions wrapped in {{ }}, evaluated against the raw BEP object as root context."
+  },
+  {
+    "path": "docs/adrs/standards-inline-bep-refs.md",
+    "description": "{{<JSONata expression>}} marks an inline reference inside a standard's markdown prose, reusing the same reference grammar used in referenceData.data; Standards.getResolvedContent() returns plain resolved text for consumers that don't need to render — a UI needing to visually mark references resolves {{...}} itself."
+  },
+  {
+    "path": "docs/adrs/no-async-write-time-validation.md",
+    "description": "A {{...}} reference is never validated at write time, since JSONata's evaluate() is always async and Entity.add()/.update() are synchronous across the ecosystem; a reference that doesn't resolve is only ever caught on read, as a visible marker. Deletion-block detection (referencesEntity) stays synchronous because it only parses a reference's syntax, never evaluates it."
   }
 ]
